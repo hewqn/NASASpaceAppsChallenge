@@ -1,0 +1,41 @@
+[
+  {
+    "id": "easy",
+    "label": "Easy",
+    "budgetScale": 1.5,
+    "minSafetyFactor": 1.1,
+    "hintLevel": "preview",
+    "catalog": "starter",
+    "maxAttempts": null,
+    "eventMode": "off",
+    "eventIntervalS": null,
+    "scoreMultiplier": 1,
+    "summary": "Wider mass and cost budgets, a live survive preview, and starter parts. Planet numbers stay the same."
+  },
+  {
+    "id": "normal",
+    "label": "Normal",
+    "budgetScale": 1,
+    "minSafetyFactor": 1.5,
+    "hintLevel": "warnings",
+    "catalog": "full",
+    "maxAttempts": null,
+    "eventMode": "once",
+    "eventIntervalS": null,
+    "scoreMultiplier": 1.5,
+    "summary": "Standard budgets, meter warnings, the full catalog, and one solar or power event during the mission."
+  },
+  {
+    "id": "hard",
+    "label": "Hard",
+    "budgetScale": 0.75,
+    "minSafetyFactor": 2,
+    "hintLevel": "none",
+    "catalog": "full",
+    "maxAttempts": 3,
+    "eventMode": "interval",
+    "eventIntervalS": 45,
+    "scoreMultiplier": 2,
+    "summary": "Tight budgets, a higher safety margin, no preview, three attempts, and an event about every 45 seconds."
+  }
+]
