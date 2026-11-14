@@ -1,7 +1,7 @@
 import { CuboidCollider, RigidBody, type RapierRigidBody } from '@react-three/rapier'
 import { useFrame } from '@react-three/fiber'
 import { useEffect, useRef } from 'react'
-import { Vector3 } from 'three'
+import { Vector3, type Group } from 'three'
 
 const cameraTarget = new Vector3()
 const cameraDesired = new Vector3()
@@ -34,6 +34,7 @@ export function Walker({
   onMove?: (x: number, z: number) => void
 }) {
   const body = useRef<RapierRigidBody>(null)
+  const model = useRef<Group>(null)
   const keys = useHeldKeys()
 
   useFrame(({ camera }) => {
@@ -53,6 +54,13 @@ export function Walker({
       { x: (x / length) * 4.2, y: jumping ? 3.5 : velocity.y, z: (z / length) * 4.2 },
       true,
     )
+    if (model.current && (x !== 0 || z !== 0)) {
+      // The model faces -z at rotation 0. Turn it toward the direction of travel.
+      const target = Math.atan2(-x, -z)
+      let delta = target - model.current.rotation.y
+      delta = Math.atan2(Math.sin(delta), Math.cos(delta))
+      model.current.rotation.y += delta * 0.2
+    }
     const position = actor.translation()
     onMove?.(position.x, position.z)
     cameraDesired.set(position.x, position.y + 3.2, position.z + 6.8)
@@ -64,10 +72,32 @@ export function Walker({
   return (
     <RigidBody ref={body} position={[0, 1.4, 2]} lockRotations colliders={false} ccd>
       <CuboidCollider args={[0.35, 0.7, 0.35]} />
-      <mesh castShadow>
-        <capsuleGeometry args={[0.32, 0.75, 6, 12]} />
-        <meshStandardMaterial color={color} roughness={0.6} />
-      </mesh>
+      <group ref={model}>
+        <mesh castShadow position={[0, -0.12, 0]}>
+          <capsuleGeometry args={[0.3, 0.6, 6, 14]} />
+          <meshStandardMaterial color={color} roughness={0.55} metalness={0.05} />
+        </mesh>
+        <mesh castShadow position={[0, 0.5, 0]}>
+          <sphereGeometry args={[0.27, 20, 16]} />
+          <meshStandardMaterial color={color} roughness={0.5} metalness={0.05} />
+        </mesh>
+        <mesh castShadow position={[0, 0.52, -0.16]} scale={[1, 0.8, 0.7]}>
+          <sphereGeometry args={[0.21, 20, 16]} />
+          <meshStandardMaterial color="#1b2430" roughness={0.12} metalness={0.9} envMapIntensity={1.6} />
+        </mesh>
+        <mesh castShadow position={[0, -0.02, 0.34]}>
+          <boxGeometry args={[0.42, 0.55, 0.22]} />
+          <meshStandardMaterial color="#b9b2a6" roughness={0.5} metalness={0.3} />
+        </mesh>
+        <mesh castShadow position={[0.36, -0.08, 0]}>
+          <capsuleGeometry args={[0.09, 0.38, 4, 8]} />
+          <meshStandardMaterial color={color} roughness={0.6} />
+        </mesh>
+        <mesh castShadow position={[-0.36, -0.08, 0]}>
+          <capsuleGeometry args={[0.09, 0.38, 4, 8]} />
+          <meshStandardMaterial color={color} roughness={0.6} />
+        </mesh>
+      </group>
     </RigidBody>
   )
 }

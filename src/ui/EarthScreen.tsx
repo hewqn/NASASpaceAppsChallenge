@@ -32,7 +32,7 @@ export function EarthScreen({
   return (
     <div className="sim-stage">
       <Suspense fallback={<p className="sim-loading">Opening the yard…</p>}>
-        <Canvas shadows camera={{ position: [0, 4, 9], fov: 48 }}>
+        <Canvas shadows dpr={[1, 1.75]} camera={{ position: [0, 4, 9], fov: 48 }}>
           <EarthYard
             inventory={inventory}
             onMove={(x, z) => {

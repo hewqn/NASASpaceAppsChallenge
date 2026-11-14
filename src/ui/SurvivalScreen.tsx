@@ -103,11 +103,13 @@ export function SurvivalScreen({
   return (
     <div className="sim-stage">
       <Suspense fallback={<p className="sim-loading">Loading the surface…</p>}>
-        <Canvas shadows camera={{ position: [0, 4, 8], fov: 48 }}>
+        <Canvas shadows dpr={[1, 1.75]} camera={{ position: [0, 4, 8], fov: 48 }}>
           <SurvivalWorld
             gravityMs2={planet.gravityMs2}
             ground={GROUND[planet.id] ?? '#8a8074'}
             sky={SKY[planet.id] ?? '#14110e'}
+            airless={(planet.referencePressure.value ?? planet.referencePressure.max ?? 0) < 1}
+            seed={planet.id.length * 17 + 3}
           />
         </Canvas>
       </Suspense>
