@@ -193,6 +193,112 @@ a { color: #f0c27a; }
   border-top: 2px solid #3a3128;
 }
 
+.bench {
+  display: grid;
+  grid-template-columns: 1.2fr 0.8fr;
+  gap: 16px;
+  margin-top: 12px;
+}
+
+.pile, .slots {
+  display: grid;
+  gap: 8px;
+}
+
+.card, .slot button {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  text-align: left;
+  background: #221c16;
+  color: #f4efe6;
+  border: 3px solid #3a3128;
+  border-radius: 14px;
+  padding: 10px;
+  width: 100%;
+}
+
+.card.picked, .slot.ready {
+  border-color: #e0a045;
+}
+
+.swatch {
+  width: 28px;
+  height: 28px;
+  border-radius: 8px;
+  flex: none;
+  border: 2px solid #1a140c;
+}
+
+.suit-col { display: grid; gap: 10px; justify-items: center; }
+
+.figure {
+  width: 92px;
+  height: 140px;
+  border-radius: 46px;
+  outline: 14px solid transparent;
+  position: relative;
+  margin: 16px;
+}
+
+.figure-head {
+  position: absolute;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: #e7d3a1;
+  top: -18px;
+  left: 28px;
+}
+
+.figure-bottle {
+  position: absolute;
+  width: 14px;
+  height: 36px;
+  border-radius: 7px;
+  background: #c4473a;
+  right: -18px;
+  top: 48px;
+}
+
+.slot { width: 100%; }
+
+.slot-clear {
+  margin-top: 6px;
+  min-height: 36px;
+  width: 100%;
+}
+
+.sizes {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 12px 0;
+}
+
+.facts {
+  list-style: none;
+  padding: 0;
+  display: grid;
+  gap: 10px;
+}
+
+.facts li {
+  border: 3px solid #3a3128;
+  border-radius: 14px;
+  padding: 12px;
+  background: #221c16;
+}
+
+.looked-up {
+  margin: 18px 0 0;
+  font-size: 1.15rem;
+}
+
+@media (max-width: 720px) {
+  .bench { grid-template-columns: 1fr; }
+}
+
 .prompt {
   margin: 8px 0;
   padding: 8px 10px;

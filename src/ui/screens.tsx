@@ -4,7 +4,9 @@ import { DESTINATION_ORDER, NASA_FACT_SHEET_NOTES } from '../data/sources'
 import type { DifficultyId } from '../types/difficulty'
 import { isDestinationUnlocked } from '../progress'
 import { celsius } from '../sim/human'
-import { deathDetail, deathTitle, exposure, survived, type Side, type Vitals } from '../sim/survival'
+import type { Design } from '../sim/design'
+import { deathDetail, deathTitle, exposure, kidResult, survived, type Side, type Vitals } from '../sim/survival'
+import { retrieve } from '../rag/retrieve'
 import { Frame } from './Frame'
 
 export function StartScreen({ onStart }: { onStart: () => void }) {
@@ -21,7 +23,7 @@ export function StartScreen({ onStart }: { onStart: () => void }) {
     >
       <ol className="steps">
         <li>Walk the yard and pick up metal, insulation, and oxygen.</li>
-        <li>Build a shell and a wrap from only what you found.</li>
+        <li>Drag what you found onto the shell, the wrap, and the air bottles.</li>
         <li>Take it to a planet. Last twenty minutes, or die for a reason you can name.</li>
       </ol>
     </Frame>
@@ -30,19 +32,22 @@ export function StartScreen({ onStart }: { onStart: () => void }) {
 
 export function PlanetSelect({
   clearedIds,
+  design,
   onBack,
   onDestination,
 }: {
   clearedIds: ReadonlySet<string>
+  design: Design
   onBack: () => void
   onDestination: (planetId: string) => void
 }) {
   const earth = planetById('earth')
+  const check = difficultyById('normal').minSafetyFactor
   return (
     <Frame
       kicker="Leave Earth"
-      title="The Moon is the first place that can kill you."
-      lede="You stay on Earth to build. Each body after the Moon opens when you survive the one before it."
+      title="Same suit. Different planet."
+      lede="The line under each name is what the physics check says this suit would do there. The planet numbers do not change. Unlock order still starts at the Moon."
       onBack={onBack}
     >
       <div className="card-list">
@@ -55,11 +60,8 @@ export function PlanetSelect({
             <article className="choice" key={planet.id}>
               <div>
                 <h2>{planet.name}</h2>
-                <p>
-                  {planet.gravityMs2} m/s²
-                  {planet.gravityDatum === '1bar' ? ' at 1 bar' : ' at the surface'}
-                  {open ? '' : ` · Locked until you clear ${previous}`}
-                </p>
+                <p>{kidResult(design, planet, check)}</p>
+                <p className="fine">{open ? 'Open' : `Locked until you clear ${previous}`}</p>
               </div>
               <button
                 className="primary"
@@ -247,6 +249,7 @@ export function DebriefScreen({
   const planet = planetById(planetId)
   const madeIt = survived(vitals)
   const cause = vitals.cause
+  const facts = retrieve(planet, madeIt ? 'survive' : (cause ?? 'oxygen'))
   return (
     <Frame
       kicker={madeIt ? 'You survived' : 'You died'}
@@ -270,11 +273,21 @@ export function DebriefScreen({
         </>
       }
     >
-      <p>
-        <a href={planet.sourceUrl} target="_blank" rel="noreferrer">
-          {planet.name} fact sheet
-        </a>
+      <h2 className="looked-up">Looked up for this result</h2>
+      <p className="fine">
+        These lines were retrieved from the fact sheets for this outcome. The physics check decided pass or fail.
+        No model filled in a number.
       </p>
+      <ul className="facts">
+        {facts.map((fact) => (
+          <li key={fact.id}>
+            <p>{fact.text}</p>
+            <a href={fact.sourceUrl} target="_blank" rel="noreferrer">
+              {planetById(fact.planetId).name} fact sheet
+            </a>
+          </li>
+        ))}
+      </ul>
       <p className="fine">
         {difficultyById(difficultyId).label} asks for a safety factor of {difficultyById(difficultyId).minSafetyFactor}.
         The planet numbers did not change.

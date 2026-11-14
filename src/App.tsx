@@ -55,6 +55,7 @@ export function App() {
     return (
       <PlanetSelect
         clearedIds={clearedIds}
+        design={design}
         onBack={() => setRoute({ screen: 'workshop' })}
         onDestination={(planetId) => setRoute({ screen: 'difficulty', planetId })}
       />

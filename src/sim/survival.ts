@@ -1,12 +1,13 @@
 import { planetById } from '../data/catalog'
 import { materialById } from '../data/materials'
-import type { DifficultyProfile } from '../types/difficulty'
 import type { Planet, TemperatureReading } from '../types/planet'
 import { isSealed, type Design } from './design'
 import { HUMAN, STEFAN_BOLTZMANN, celsius } from './human'
 
 /** A short surface stay. Long enough to run out of a lungful of air. */
 export const MISSION_SECONDS = 20 * 60
+/** About three real seconds at the 30× mission clock, so a vacuum death is visible. */
+export const VACUUM_FAIL_S = 90
 
 export type Side = 'hot' | 'cold'
 export type DeathCause = 'pressure' | 'crush' | 'oxygen' | 'burn' | 'freeze'
@@ -123,7 +124,7 @@ export function stepVitals(
   let oxygenKg = vitals.oxygenKg
 
   if (!sealed && outsidePa < HUMAN.armstrongPa) {
-    cause = 'pressure'
+    if (vitals.elapsedS + dt >= VACUUM_FAIL_S) cause = 'pressure'
   } else if (sealed && design.shellMaterialId && ambientK >= materialById(design.shellMaterialId).meltingK) {
     cause = 'burn'
   } else if (sealed) {
@@ -210,9 +211,21 @@ export function survived(vitals: Vitals): boolean {
   return vitals.alive && vitals.elapsedS >= MISSION_SECONDS - 1e-6
 }
 
-export function previewLine(design: Design, planet: Planet, profile: DifficultyProfile, side: Side): string {
-  const result = runMission(design, planet, profile.minSafetyFactor, side)
-  const where = `${planet.name}, ${side} side`
-  if (survived(result)) return `${where}: you last the ${MISSION_SECONDS / 60} minutes.`
-  return `${where}: ${deathTitle(result.cause ?? 'oxygen').replace(/\.$/, '')}.`
+/** One plain sentence for the planet card. No units to type. */
+export function kidResult(design: Design, planet: Planet, minSafetyFactor: number, side: Side = 'hot'): string {
+  const where = side === 'hot' ? 'Hot side' : 'Cold side'
+  const result = runMission(design, planet, minSafetyFactor, side)
+  if (survived(result)) return `${where}: you would last.`
+  switch (result.cause) {
+    case 'pressure':
+      return `${where}: the air would vanish.`
+    case 'oxygen':
+      return `${where}: you would run out of air.`
+    case 'burn':
+      return `${where}: you would get too hot.`
+    case 'freeze':
+      return `${where}: you would freeze.`
+    default:
+      return `${where}: the shell would be crushed.`
+  }
 }

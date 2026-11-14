@@ -1,0 +1,2616 @@
+<roblox version="4">
+  <Item class="Lighting" referent="0">
+    <Properties>
+      <string name="Name">Lighting</string>
+      <float name="Brightness">2</float>
+      <float name="ClockTime">14</float>
+      <float name="GeographicLatitude">20</float>
+    </Properties>
+  </Item>
+  <Item class="ReplicatedStorage" referent="1">
+    <Properties>
+      <string name="Name">ReplicatedStorage</string>
+    </Properties>
+    <Item class="Folder" referent="2">
+      <Properties>
+        <string name="Name">CODAG</string>
+      </Properties>
+      <Item class="Folder" referent="3">
+        <Properties>
+          <string name="Name">Data</string>
+        </Properties>
+        <Item class="ModuleScript" referent="4">
+          <Properties>
+            <string name="Name">Catalog</string>
+            <string name="Source"><![CDATA[local function sibling(name: string)
+	if script ~= nil and script.Parent ~= nil then
+		local child = script.Parent:FindFirstChild(name)
+		if child ~= nil then
+			return require(child)
+		end
+	end
+	return require("./" .. name)
+end
+
+local PLANETS = sibling("Planets")
+local MATERIALS = sibling("Materials")
+local DIFFICULTIES = sibling("Difficulty")
+
+local FACT_SHEET_HOST = "https://nssdc.gsfc.nasa.gov/planetary/factsheet/"
+
+local function planetById(id: string)
+	for _, planet in PLANETS do
+		if planet.id == id then
+			return planet
+		end
+	end
+	error("Unknown body: " .. id)
+end
+
+local function materialById(id: string)
+	for _, material in MATERIALS do
+		if material.id == id then
+			return material
+		end
+	end
+	error("Unknown material: " .. id)
+end
+
+local function difficultyById(id: string)
+	for _, profile in DIFFICULTIES do
+		if profile.id == id then
+			return profile
+		end
+	end
+	error("Unknown difficulty: " .. id)
+end
+
+local function assertFactSheetRecords(planets)
+	local seen = {}
+	for _, planet in planets do
+		if seen[planet.id] then
+			error("Duplicate body id: " .. planet.id)
+		end
+		seen[planet.id] = true
+		if string.sub(planet.sourceUrl, 1, #FACT_SHEET_HOST) ~= FACT_SHEET_HOST then
+			error(planet.id .. " source is not an NSSDC fact sheet")
+		end
+		if not (planet.gravityMs2 > 0) then
+			error(planet.id .. " is missing gravity")
+		end
+		if not (planet.solarIrradianceWm2 > 0) then
+			error(planet.id .. " is missing solar irradiance")
+		end
+		if planet.gravityDatum == "1bar" and planet.referencePressure.value ~= 100000 then
+			error(planet.id .. " 1-bar datum must start at 100000 Pa")
+		end
+		if planet.texture ~= nil then
+			error(planet.id .. " texture is not loaded yet")
+		end
+	end
+end
+
+return {
+	PLANETS = PLANETS,
+	MATERIALS = MATERIALS,
+	DIFFICULTIES = DIFFICULTIES,
+	planetById = planetById,
+	materialById = materialById,
+	difficultyById = difficultyById,
+	assertFactSheetRecords = assertFactSheetRecords,
+}
+]]></string>
+          </Properties>
+        </Item>
+        <Item class="ModuleScript" referent="5">
+          <Properties>
+            <string name="Name">Difficulty</string>
+            <string name="Source"><![CDATA[-- Generated from src/data/difficulty.json. Edit the JSON, then run npm run export:roblox.
+return {
+  {
+    id = "easy",
+    label = "Easy",
+    budgetScale = 1.5,
+    minSafetyFactor = 1.1,
+    hintLevel = "preview",
+    catalog = "starter",
+    maxAttempts = nil,
+    eventMode = "off",
+    eventIntervalS = nil,
+    scoreMultiplier = 1,
+    summary = "Wider mass and cost budgets, a live survive preview, and starter parts. Planet numbers stay the same.",
+  },
+  {
+    id = "normal",
+    label = "Normal",
+    budgetScale = 1,
+    minSafetyFactor = 1.5,
+    hintLevel = "warnings",
+    catalog = "full",
+    maxAttempts = nil,
+    eventMode = "once",
+    eventIntervalS = nil,
+    scoreMultiplier = 1.5,
+    summary = "Standard budgets, meter warnings, the full catalog, and one solar or power event during the mission.",
+  },
+  {
+    id = "hard",
+    label = "Hard",
+    budgetScale = 0.75,
+    minSafetyFactor = 2,
+    hintLevel = "none",
+    catalog = "full",
+    maxAttempts = 3,
+    eventMode = "interval",
+    eventIntervalS = 45,
+    scoreMultiplier = 2,
+    summary = "Tight budgets, a higher safety margin, no preview, three attempts, and an event about every 45 seconds.",
+  },
+}
+]]></string>
+          </Properties>
+        </Item>
+        <Item class="ModuleScript" referent="6">
+          <Properties>
+            <string name="Name">Materials</string>
+            <string name="Source"><![CDATA[-- Generated from src/data/materials.json. Edit the JSON, then run npm run export:roblox.
+return {
+  {
+    id = "aluminum",
+    name = "Aluminum sheet",
+    blurb = "Light metal from the shed. It holds a vacuum, and it melts far below Venus.",
+    densityKgM3 = 2700,
+    yieldPa = 276000000,
+    conductivity = 167,
+    meltingK = 855,
+    structural = true,
+    color = "#c5ced6",
+    foundKg = 25,
+    position = {
+      2.1,
+      0.45,
+      0.4,
+    },
+    sourceNote = "Density is the usual 2700 kg/m³ for aluminum. Yield, conductivity, and melting point are typical 6061 handbook values, not NASA planet data.",
+  },
+  {
+    id = "steel",
+    name = "Steel scrap",
+    blurb = "Heavy and strong. It conducts heat so well that a bare steel shell cooks or freezes you.",
+    densityKgM3 = 7850,
+    yieldPa = 250000000,
+    conductivity = 50,
+    meltingK = 1700,
+    structural = true,
+    color = "#8d7355",
+    foundKg = 40,
+    position = {
+      2.5,
+      0.5,
+      1.3,
+    },
+    sourceNote = "Mild-steel handbook values: about 7850 kg/m³, yield near 250 MPa, conductivity near 50 W/m·K.",
+  },
+  {
+    id = "aerogel",
+    name = "Aerogel blanket",
+    blurb = "Almost no heat gets through. Too weak to hold pressure by itself.",
+    densityKgM3 = 150,
+    yieldPa = 100000,
+    conductivity = 0.015,
+    meltingK = 1400,
+    structural = false,
+    color = "#d5e4ea",
+    foundKg = 8,
+    position = {
+      0.2,
+      0.4,
+      -2.8,
+    },
+    sourceNote = "Silica aerogel blanket: low density and conductivity around 0.015 W/m·K. It is insulation, not a pressure shell.",
+  },
+  {
+    id = "wool",
+    name = "Wool batting",
+    blurb = "Enough for a short cold stay. It chars long before Venus.",
+    densityKgM3 = 300,
+    yieldPa = 0,
+    conductivity = 0.04,
+    meltingK = 450,
+    structural = false,
+    color = "#c4a574",
+    foundKg = 6,
+    position = {
+      -1.4,
+      0.4,
+      -2.6,
+    },
+    sourceNote = "Wool batting is a poor structural material. Conductivity is about 0.04 W/m·K, and it scorches well below 200 °C.",
+  },
+  {
+    id = "oxygen",
+    name = "Oxygen cylinders",
+    blurb = "Earth air does not come with you. This is the oxygen you can bottle and carry.",
+    densityKgM3 = 0,
+    yieldPa = 0,
+    conductivity = 0,
+    meltingK = 0,
+    structural = false,
+    color = "#d45d4a",
+    foundKg = 2,
+    position = {
+      1.6,
+      0.55,
+      -2.4,
+    },
+    sourceNote = "The gas is oxygen. A full cylinder in this yard holds 2 kg, about two days of one person's breathing at the NASA life-support planning rate.",
+  },
+}
+]]></string>
+          </Properties>
+        </Item>
+        <Item class="ModuleScript" referent="7">
+          <Properties>
+            <string name="Name">Planets</string>
+            <string name="Source"><![CDATA[-- Generated from src/data/planets.json. Edit the JSON, then run npm run export:roblox.
+return {
+  {
+    id = "earth",
+    name = "Earth",
+    role = "tutorial",
+    archetype = "rocky",
+    sourceUrl = "https://nssdc.gsfc.nasa.gov/planetary/factsheet/earthfact.html",
+    gravityMs2 = 9.82,
+    gravityDatum = "surface",
+    gravityTranscribedFrom = "Surface gravity (mean) (m/s2): 9.820",
+    referencePressure = {
+      value = 101400,
+      min = nil,
+      max = nil,
+      transcribedFrom = "Surface pressure: 1014 mb",
+    },
+    solarIrradianceWm2 = 1361,
+    solarIrradianceTranscribedFrom = "Solar irradiance (W/m2): 1361.0",
+    blackBodyK = 254,
+    blackBodyTranscribedFrom = "Black-body temperature (K): 254.0",
+    temperatures = {
+      {
+        label = "Average",
+        kelvin = 288,
+        minK = nil,
+        maxK = nil,
+        transcribedFrom = "Average temperature: 288 K (15 C)",
+      },
+      {
+        label = "Diurnal range",
+        kelvin = nil,
+        minK = 283,
+        maxK = 293,
+        transcribedFrom = "Diurnal temperature range: 283 K to 293 K (10 to 20 C)",
+      },
+    },
+    scaleHeightM = {
+      value = 8500,
+      min = nil,
+      max = nil,
+      transcribedFrom = "Scale height: 8.5 km",
+    },
+    meanMolarMassKgPerMol = {
+      value = 0.02897,
+      min = nil,
+      max = nil,
+      transcribedFrom = "Mean molecular weight: 28.97",
+    },
+    densityKgM3 = {
+      value = 1.217,
+      min = nil,
+      max = nil,
+      transcribedFrom = "Surface density: 1.217 kg/m3",
+    },
+    atmosphereComposition = "78.08% nitrogen (N2), 20.95% oxygen (O2); argon 9340 ppm; carbon dioxide 420 ppm",
+    atmosphereTranscribedFrom = "Atmospheric composition (by volume, dry air): 78.08% Nitrogen (N2), 20.95% Oxygen (O2); Argon (Ar) 9340 ppm; Carbon Dioxide (CO2) 420 ppm",
+    escapeVelocityMs = 11186,
+    escapeVelocityTranscribedFrom = "Escape velocity (km/s): 11.186",
+    dayLengthS = 86400,
+    dayLengthTranscribedFrom = "Length of day (hrs): 24.0000",
+    semimajorAxisAu = 1.00000011,
+    semimajorAxisTranscribedFrom = "Semimajor axis (AU): 1.00000011",
+    massKg = 5.9722e+24,
+    massTranscribedFrom = "Mass (10^24 kg): 5.9722",
+    equatorialRadiusM = 6378137,
+    equatorialRadiusTranscribedFrom = "Equatorial radius (km): 6378.137",
+    texture = nil,
+  },
+  {
+    id = "moon",
+    name = "Moon",
+    role = "destination",
+    archetype = "rocky",
+    sourceUrl = "https://nssdc.gsfc.nasa.gov/planetary/factsheet/moonfact.html",
+    gravityMs2 = 1.62,
+    gravityDatum = "surface",
+    gravityTranscribedFrom = "Surface gravity (m/s2): 1.62",
+    referencePressure = {
+      value = 3e-10,
+      min = nil,
+      max = nil,
+      transcribedFrom = "Surface pressure (night): 3 x 10^-15 bar (2 x 10^-12 torr)",
+    },
+    solarIrradianceWm2 = 1361,
+    solarIrradianceTranscribedFrom = "Solar irradiance (W/m2): 1361.0",
+    blackBodyK = 270.4,
+    blackBodyTranscribedFrom = "Black-body temperature (K): 270.4",
+    temperatures = {
+      {
+        label = "Diurnal range at the equator",
+        kelvin = nil,
+        minK = 95,
+        maxK = 390,
+        transcribedFrom = "Diurnal temperature range (equator): 95 K to 390 K (~ -290 F to +240 F)",
+      },
+    },
+    scaleHeightM = {
+      value = nil,
+      min = nil,
+      max = nil,
+      transcribedFrom = "This Moon fact sheet does not list a scale height.",
+    },
+    meanMolarMassKgPerMol = {
+      value = nil,
+      min = nil,
+      max = nil,
+      transcribedFrom = "This Moon fact sheet does not list a mean molecular weight.",
+    },
+    densityKgM3 = nil,
+    atmosphereComposition = "A thin, poorly known exosphere. Nighttime estimates include helium, neon, hydrogen, and argon.",
+    atmosphereTranscribedFrom = "Estimated composition (night, particles per cubic cm): Helium-4 40,000; Neon-20 40,000; Hydrogen 35,000; Argon-40 30,000. The sheet says these are upper-limit estimates.",
+    escapeVelocityMs = 2380,
+    escapeVelocityTranscribedFrom = "Escape velocity (km/s): 2.38",
+    dayLengthS = 2551392,
+    dayLengthTranscribedFrom = "Synodic period (days): 29.53. This sheet has no separate Length of day row.",
+    semimajorAxisAu = nil,
+    semimajorAxisTranscribedFrom = "The orbital elements on this sheet are for the Moon's orbit around Earth (semimajor axis 0.3844 x 10^6 km). Solar irradiance is listed as 1361.0 W/m2.",
+    massKg = 7.346e+22,
+    massTranscribedFrom = "Mass (10^24 kg): 0.07346",
+    equatorialRadiusM = 1738100,
+    equatorialRadiusTranscribedFrom = "Equatorial radius (km): 1738.1",
+    texture = nil,
+  },
+  {
+    id = "mercury",
+    name = "Mercury",
+    role = "destination",
+    archetype = "rocky",
+    sourceUrl = "https://nssdc.gsfc.nasa.gov/planetary/factsheet/mercuryfact.html",
+    gravityMs2 = 3.7,
+    gravityDatum = "surface",
+    gravityTranscribedFrom = "Surface gravity (mean) (m/s2): 3.70",
+    referencePressure = {
+      value = nil,
+      min = nil,
+      max = 5e-10,
+      transcribedFrom = "Surface pressure: <~5 x 10^-15 bar (0.005 picobar)",
+    },
+    solarIrradianceWm2 = 9082.7,
+    solarIrradianceTranscribedFrom = "Solar irradiance (W/m2): 9082.7",
+    blackBodyK = 439.6,
+    blackBodyTranscribedFrom = "Black-body temperature (K): 439.6",
+    temperatures = {
+      {
+        label = "Average",
+        kelvin = 440,
+        minK = nil,
+        maxK = nil,
+        transcribedFrom = "Average temperature: 440 K (167 C)",
+      },
+      {
+        label = "Sunward side",
+        kelvin = nil,
+        minK = 590,
+        maxK = 725,
+        transcribedFrom = "590-725 K, sunward side",
+      },
+    },
+    scaleHeightM = {
+      value = nil,
+      min = nil,
+      max = nil,
+      transcribedFrom = "This Mercury fact sheet does not list a scale height. It describes a surface-bounded exosphere.",
+    },
+    meanMolarMassKgPerMol = {
+      value = nil,
+      min = nil,
+      max = nil,
+      transcribedFrom = "This Mercury fact sheet does not list a mean molecular weight.",
+    },
+    densityKgM3 = nil,
+    atmosphereComposition = "Surface-bounded exosphere, essentially a vacuum. Sodium, magnesium, oxygen, and other species vary with local time.",
+    atmosphereTranscribedFrom = "The atmosphere of Mercury is a surface bounded exosphere, essentially a vacuum. Column abundances (10^6 per cm2) include Sodium 12,000-200,000 and Magnesium 100,000.",
+    escapeVelocityMs = 4300,
+    escapeVelocityTranscribedFrom = "Escape velocity (km/s): 4.3",
+    dayLengthS = 15201360,
+    dayLengthTranscribedFrom = "Length of day (hrs): 4222.6",
+    semimajorAxisAu = 0.38709893,
+    semimajorAxisTranscribedFrom = "Semimajor axis (AU): 0.38709893",
+    massKg = 3.301e+23,
+    massTranscribedFrom = "Mass (10^24 kg): 0.33010",
+    equatorialRadiusM = 2440500,
+    equatorialRadiusTranscribedFrom = "Equatorial radius (km): 2440.5",
+    texture = nil,
+  },
+  {
+    id = "venus",
+    name = "Venus",
+    role = "destination",
+    archetype = "rocky",
+    sourceUrl = "https://nssdc.gsfc.nasa.gov/planetary/factsheet/venusfact.html",
+    gravityMs2 = 8.87,
+    gravityDatum = "surface",
+    gravityTranscribedFrom = "Surface gravity (mean) (m/s2): 8.87",
+    referencePressure = {
+      value = 9200000,
+      min = nil,
+      max = nil,
+      transcribedFrom = "Surface pressure: 92 bars",
+    },
+    solarIrradianceWm2 = 2601.3,
+    solarIrradianceTranscribedFrom = "Solar irradiance (W/m2): 2601.3",
+    blackBodyK = 226.6,
+    blackBodyTranscribedFrom = "Black-body temperature (K): 226.6",
+    temperatures = {
+      {
+        label = "Average",
+        kelvin = 737,
+        minK = 737,
+        maxK = 737,
+        transcribedFrom = "Average temperature: 737 K (464 C). Diurnal temperature range: ~0",
+      },
+    },
+    scaleHeightM = {
+      value = 15900,
+      min = nil,
+      max = nil,
+      transcribedFrom = "Scale height: 15.9 km",
+    },
+    meanMolarMassKgPerMol = {
+      value = 0.04345,
+      min = nil,
+      max = nil,
+      transcribedFrom = "Mean molecular weight: 43.45",
+    },
+    densityKgM3 = {
+      value = 65,
+      min = nil,
+      max = nil,
+      transcribedFrom = "Surface density: ~65. kg/m3",
+    },
+    atmosphereComposition = "96.5% carbon dioxide (CO2), 3.5% nitrogen (N2)",
+    atmosphereTranscribedFrom = "Atmospheric composition (near surface, by volume): 96.5% Carbon Dioxide (CO2), 3.5% Nitrogen (N2)",
+    escapeVelocityMs = 10360,
+    escapeVelocityTranscribedFrom = "Escape velocity (km/s): 10.36",
+    dayLengthS = 10087200,
+    dayLengthTranscribedFrom = "Length of day (hrs): 2802.0",
+    semimajorAxisAu = 0.72333199,
+    semimajorAxisTranscribedFrom = "Semimajor axis (AU): 0.72333199",
+    massKg = 4.8673e+24,
+    massTranscribedFrom = "Mass (10^24 kg): 4.8673",
+    equatorialRadiusM = 6051800,
+    equatorialRadiusTranscribedFrom = "Equatorial radius (km): 6051.8",
+    texture = nil,
+  },
+  {
+    id = "mars",
+    name = "Mars",
+    role = "destination",
+    archetype = "rocky",
+    sourceUrl = "https://nssdc.gsfc.nasa.gov/planetary/factsheet/marsfact.html",
+    gravityMs2 = 3.73,
+    gravityDatum = "surface",
+    gravityTranscribedFrom = "Surface gravity (mean) (m/s2): 3.73",
+    referencePressure = {
+      value = 636,
+      min = 400,
+      max = 870,
+      transcribedFrom = "Surface pressure: 6.36 mb at mean radius (variable from 4.0 to 8.7 mb depending on season)",
+    },
+    solarIrradianceWm2 = 586.2,
+    solarIrradianceTranscribedFrom = "Solar irradiance (W/m2): 586.2",
+    blackBodyK = 209.8,
+    blackBodyTranscribedFrom = "Black-body temperature (K): 209.8",
+    temperatures = {
+      {
+        label = "Average",
+        kelvin = 214,
+        minK = nil,
+        maxK = nil,
+        transcribedFrom = "Average temperature: ~214 K (-59 C)",
+      },
+      {
+        label = "Viking 1 lander site, diurnal",
+        kelvin = nil,
+        minK = 184,
+        maxK = 242,
+        transcribedFrom = "Diurnal temperature range: 184 K to 242 K (-89 to -31 C) (Viking 1 Lander site)",
+      },
+    },
+    scaleHeightM = {
+      value = 11000,
+      min = nil,
+      max = nil,
+      transcribedFrom = "Scale height: 11.0 km",
+    },
+    meanMolarMassKgPerMol = {
+      value = 0.04349,
+      min = nil,
+      max = nil,
+      transcribedFrom = "Mean molecular weight: 43.49",
+    },
+    densityKgM3 = {
+      value = 0.016,
+      min = nil,
+      max = nil,
+      transcribedFrom = "Surface density: ~0.016 +/- 0.006 kg/m3",
+    },
+    atmosphereComposition = "95.1% carbon dioxide (CO2), 2.59% nitrogen (N2), 1.94% argon, 0.16% oxygen",
+    atmosphereTranscribedFrom = "Atmospheric composition (by volume): Carbon Dioxide (CO2) 95.1%; Nitrogen (N2) 2.59%; Argon (Ar) 1.94%; Oxygen (O2) 0.16%",
+    escapeVelocityMs = 5030,
+    escapeVelocityTranscribedFrom = "Escape velocity (km/s): 5.03",
+    dayLengthS = 88774.92,
+    dayLengthTranscribedFrom = "Length of day (hrs): 24.6597",
+    semimajorAxisAu = 1.52366231,
+    semimajorAxisTranscribedFrom = "Semimajor axis (AU): 1.52366231",
+    massKg = 6.4169e+23,
+    massTranscribedFrom = "Mass (10^24 kg): 0.64169",
+    equatorialRadiusM = 3396200,
+    equatorialRadiusTranscribedFrom = "Equatorial radius (km): 3396.2",
+    texture = nil,
+  },
+  {
+    id = "jupiter",
+    name = "Jupiter",
+    role = "destination",
+    archetype = "gas",
+    sourceUrl = "https://nssdc.gsfc.nasa.gov/planetary/factsheet/jupiterfact.html",
+    gravityMs2 = 25.92,
+    gravityDatum = "1bar",
+    gravityTranscribedFrom = "Gravity (mean, 1 bar) (m/s2): 25.92",
+    referencePressure = {
+      value = 100000,
+      min = nil,
+      max = nil,
+      transcribedFrom = "Altitude zero is the 1 bar level, where this sheet gives gravity and temperature. The atmosphere block lists Surface Pressure: >>1000 bars, which is not a located surface.",
+    },
+    solarIrradianceWm2 = 50.26,
+    solarIrradianceTranscribedFrom = "Solar irradiance (W/m2): 50.26",
+    blackBodyK = 109.9,
+    blackBodyTranscribedFrom = "Black-body temperature (K): 109.9",
+    temperatures = {
+      {
+        label = "At 1 bar",
+        kelvin = 165,
+        minK = nil,
+        maxK = nil,
+        transcribedFrom = "Temperature at 1 bar: 165 K (-108 C)",
+      },
+      {
+        label = "At 0.1 bar",
+        kelvin = 112,
+        minK = nil,
+        maxK = nil,
+        transcribedFrom = "Temperature at 0.1 bar: 112 K (-161 C)",
+      },
+    },
+    scaleHeightM = {
+      value = 27000,
+      min = nil,
+      max = nil,
+      transcribedFrom = "Scale height: 27 km",
+    },
+    meanMolarMassKgPerMol = {
+      value = 0.00222,
+      min = nil,
+      max = nil,
+      transcribedFrom = "Mean molecular weight: 2.22",
+    },
+    densityKgM3 = {
+      value = 0.16,
+      min = nil,
+      max = nil,
+      transcribedFrom = "Density at 1 bar: 0.16 kg/m3",
+    },
+    atmosphereComposition = "89.8% molecular hydrogen (H2), 10.2% helium (He)",
+    atmosphereTranscribedFrom = "Atmospheric composition (by volume): Molecular hydrogen (H2) 89.8% (2.0%); Helium (He) 10.2% (2.0%)",
+    escapeVelocityMs = 59500,
+    escapeVelocityTranscribedFrom = "Escape velocity (km/s): 59.5",
+    dayLengthS = 35733.24,
+    dayLengthTranscribedFrom = "Length of day (hrs): 9.9259",
+    semimajorAxisAu = 5.20336301,
+    semimajorAxisTranscribedFrom = "Semimajor axis (AU): 5.20336301",
+    massKg = 1.89813e+27,
+    massTranscribedFrom = "Mass (10^24 kg): 1,898.13",
+    equatorialRadiusM = 71492000,
+    equatorialRadiusTranscribedFrom = "Equatorial radius (1 bar level) (km): 71,492",
+    texture = nil,
+  },
+  {
+    id = "saturn",
+    name = "Saturn",
+    role = "destination",
+    archetype = "gas",
+    sourceUrl = "https://nssdc.gsfc.nasa.gov/planetary/factsheet/saturnfact.html",
+    gravityMs2 = 11.19,
+    gravityDatum = "1bar",
+    gravityTranscribedFrom = "Gravity (mean, 1 bar) (m/s2): 11.19",
+    referencePressure = {
+      value = 100000,
+      min = nil,
+      max = nil,
+      transcribedFrom = "Altitude zero is the 1 bar level, where this sheet gives gravity and temperature. The atmosphere block lists Surface Pressure: >>1000 bars, which is not a located surface.",
+    },
+    solarIrradianceWm2 = 14.82,
+    solarIrradianceTranscribedFrom = "Solar irradiance (W/m2): 14.82",
+    blackBodyK = 81,
+    blackBodyTranscribedFrom = "Black-body temperature (K): 81.0",
+    temperatures = {
+      {
+        label = "At 1 bar",
+        kelvin = 134,
+        minK = nil,
+        maxK = nil,
+        transcribedFrom = "Temperature at 1 bar: 134 K (-139 C)",
+      },
+      {
+        label = "At 0.1 bar",
+        kelvin = 84,
+        minK = nil,
+        maxK = nil,
+        transcribedFrom = "Temperature at 0.1 bar: 84 K (-189 C)",
+      },
+    },
+    scaleHeightM = {
+      value = 59500,
+      min = nil,
+      max = nil,
+      transcribedFrom = "Scale height: 59.5 km",
+    },
+    meanMolarMassKgPerMol = {
+      value = 0.00207,
+      min = nil,
+      max = nil,
+      transcribedFrom = "Mean molecular weight: 2.07",
+    },
+    densityKgM3 = {
+      value = 0.19,
+      min = nil,
+      max = nil,
+      transcribedFrom = "Density at 1 bar: 0.19 kg/m3",
+    },
+    atmosphereComposition = "96.3% molecular hydrogen (H2), 3.25% helium (He)",
+    atmosphereTranscribedFrom = "Atmospheric composition (by volume): Molecular hydrogen (H2) 96.3% (2.4%); Helium (He) 3.25% (2.4%)",
+    escapeVelocityMs = 35500,
+    escapeVelocityTranscribedFrom = "Escape velocity (km/s): 35.5",
+    dayLengthS = 38361.6,
+    dayLengthTranscribedFrom = "Length of day (hrs): 10.656",
+    semimajorAxisAu = 9.53707032,
+    semimajorAxisTranscribedFrom = "Semimajor axis (AU): 9.53707032",
+    massKg = 5.6832e+26,
+    massTranscribedFrom = "Mass (10^24 kg): 568.32",
+    equatorialRadiusM = 60268000,
+    equatorialRadiusTranscribedFrom = "Equatorial radius (1 bar level) (km): 60,268",
+    texture = nil,
+  },
+  {
+    id = "uranus",
+    name = "Uranus",
+    role = "destination",
+    archetype = "ice",
+    sourceUrl = "https://nssdc.gsfc.nasa.gov/planetary/factsheet/uranusfact.html",
+    gravityMs2 = 9.01,
+    gravityDatum = "1bar",
+    gravityTranscribedFrom = "Gravity (mean, 1 bar) (m/s2): 9.01",
+    referencePressure = {
+      value = 100000,
+      min = nil,
+      max = nil,
+      transcribedFrom = "Altitude zero is the 1 bar level, where this sheet gives gravity and temperature. The atmosphere block lists Surface Pressure: >>1000 bars, which is not a located surface.",
+    },
+    solarIrradianceWm2 = 3.69,
+    solarIrradianceTranscribedFrom = "Solar irradiance (W/m2): 3.69",
+    blackBodyK = 58.1,
+    blackBodyTranscribedFrom = "Black-body temperature (K): 58.1",
+    temperatures = {
+      {
+        label = "At 1 bar",
+        kelvin = 76,
+        minK = nil,
+        maxK = nil,
+        transcribedFrom = "Temperature at 1 bar: 76 K (-197 C)",
+      },
+      {
+        label = "At 0.1 bar",
+        kelvin = 53,
+        minK = nil,
+        maxK = nil,
+        transcribedFrom = "Temperature at 0.1 bar: 53 K (-220 C)",
+      },
+    },
+    scaleHeightM = {
+      value = 27700,
+      min = nil,
+      max = nil,
+      transcribedFrom = "Scale height: 27.7 km",
+    },
+    meanMolarMassKgPerMol = {
+      value = 0.00264,
+      min = nil,
+      max = nil,
+      transcribedFrom = "Mean molecular weight: 2.64",
+    },
+    densityKgM3 = {
+      value = 0.42,
+      min = nil,
+      max = nil,
+      transcribedFrom = "Density at 1 bar: 0.42 kg/m3",
+    },
+    atmosphereComposition = "82.5% molecular hydrogen (H2), 15.2% helium (He), 2.3% methane (CH4)",
+    atmosphereTranscribedFrom = "Atmospheric composition (by volume): Molecular hydrogen (H2) 82.5% (3.3%); Helium (He) 15.2% (3.3%); Methane (CH4) 2.3%",
+    escapeVelocityMs = 21300,
+    escapeVelocityTranscribedFrom = "Escape velocity (km/s): 21.3",
+    dayLengthS = 62064,
+    dayLengthTranscribedFrom = "Length of day (hrs): 17.24",
+    semimajorAxisAu = 19.19126393,
+    semimajorAxisTranscribedFrom = "Semimajor axis (AU): 19.19126393",
+    massKg = 8.6811e+25,
+    massTranscribedFrom = "Mass (10^24 kg): 86.811",
+    equatorialRadiusM = 25559000,
+    equatorialRadiusTranscribedFrom = "Equatorial radius (1 bar level) (km): 25,559",
+    texture = nil,
+  },
+  {
+    id = "neptune",
+    name = "Neptune",
+    role = "destination",
+    archetype = "ice",
+    sourceUrl = "https://nssdc.gsfc.nasa.gov/planetary/factsheet/neptunefact.html",
+    gravityMs2 = 11.27,
+    gravityDatum = "1bar",
+    gravityTranscribedFrom = "Gravity (mean, 1 bar) (m/s2): 11.27",
+    referencePressure = {
+      value = 100000,
+      min = nil,
+      max = nil,
+      transcribedFrom = "Altitude zero is the 1 bar level, where this sheet gives gravity and temperature. The atmosphere block lists Surface Pressure: >>1000 bars, which is not a located surface.",
+    },
+    solarIrradianceWm2 = 1.508,
+    solarIrradianceTranscribedFrom = "Solar irradiance (W/m2): 1.508",
+    blackBodyK = 46.6,
+    blackBodyTranscribedFrom = "Black-body temperature (K): 46.6",
+    temperatures = {
+      {
+        label = "At 1 bar",
+        kelvin = 72,
+        minK = nil,
+        maxK = nil,
+        transcribedFrom = "Temperature at 1 bar: 72 K (-201 C)",
+      },
+      {
+        label = "At 0.1 bar",
+        kelvin = 55,
+        minK = nil,
+        maxK = nil,
+        transcribedFrom = "Temperature at 0.1 bar: 55 K (-218 C)",
+      },
+    },
+    scaleHeightM = {
+      value = nil,
+      min = 19100,
+      max = 20300,
+      transcribedFrom = "Scale height: 19.1 - 20.3 km",
+    },
+    meanMolarMassKgPerMol = {
+      value = nil,
+      min = 0.00253,
+      max = 0.00269,
+      transcribedFrom = "Mean molecular weight: 2.53 - 2.69",
+    },
+    densityKgM3 = {
+      value = 0.45,
+      min = nil,
+      max = nil,
+      transcribedFrom = "Density at 1 bar: 0.45 kg/m3",
+    },
+    atmosphereComposition = "80.0% molecular hydrogen (H2), 19.0% helium (He), 1.5% methane (CH4)",
+    atmosphereTranscribedFrom = "Atmospheric composition (by volume): Molecular hydrogen (H2) 80.0% (3.2%); Helium (He) 19.0% (3.2%); Methane (CH4) 1.5% (0.5%)",
+    escapeVelocityMs = 23500,
+    escapeVelocityTranscribedFrom = "Escape velocity (km/s): 23.5",
+    dayLengthS = 57996,
+    dayLengthTranscribedFrom = "Length of day (hrs): 16.11",
+    semimajorAxisAu = 30.06896348,
+    semimajorAxisTranscribedFrom = "Semimajor axis (AU): 30.06896348",
+    massKg = 1.02409e+26,
+    massTranscribedFrom = "Mass (10^24 kg): 102.409",
+    equatorialRadiusM = 24764000,
+    equatorialRadiusTranscribedFrom = "Equatorial radius (1 bar level) (km): 24,764",
+    texture = nil,
+  },
+}
+]]></string>
+          </Properties>
+        </Item>
+        <Item class="ModuleScript" referent="8">
+          <Properties>
+            <string name="Name">Sources</string>
+            <string name="Source"><![CDATA[-- Pages this build actually reads. Submission lists should match this file.
+
+local NASA_FACT_SHEET_INDEX = "https://nssdc.gsfc.nasa.gov/planetary/planetfact.html"
+local NASA_FACT_SHEET_NOTES = "https://nssdc.gsfc.nasa.gov/planetary/factsheet/planetfact_notes.html"
+local NASA_PARAMETER_NOTES = "https://nssdc.gsfc.nasa.gov/planetary/factsheet/fact_notes.html"
+
+local DESTINATION_ORDER = {
+	"moon",
+	"mars",
+	"mercury",
+	"venus",
+	"jupiter",
+	"saturn",
+	"uranus",
+	"neptune",
+}
+
+return {
+	NASA_FACT_SHEET_INDEX = NASA_FACT_SHEET_INDEX,
+	NASA_FACT_SHEET_NOTES = NASA_FACT_SHEET_NOTES,
+	NASA_PARAMETER_NOTES = NASA_PARAMETER_NOTES,
+	DESTINATION_ORDER = DESTINATION_ORDER,
+}
+]]></string>
+          </Properties>
+        </Item>
+      </Item>
+      <Item class="Folder" referent="9">
+        <Properties>
+          <string name="Name">Sim</string>
+        </Properties>
+        <Item class="ModuleScript" referent="10">
+          <Properties>
+            <string name="Name">Design</string>
+            <string name="Source"><![CDATA[local function dataModule(name: string)
+	if script ~= nil and script.Parent ~= nil and script.Parent.Parent ~= nil then
+		local data = script.Parent.Parent:FindFirstChild("Data")
+		if data ~= nil then
+			local child = data:FindFirstChild(name)
+			if child ~= nil then
+				return require(child)
+			end
+		end
+	end
+	return require("../Data/" .. name)
+end
+
+local Catalog = dataModule("Catalog")
+local materialById = Catalog.materialById
+
+local TANK_KG_PER_OXYGEN_KG = 5
+
+local function emptyDesign()
+	return {
+		shellMaterialId = nil,
+		shellRadiusM = 0.48,
+		shellThicknessM = 0.0016,
+		insulationMaterialId = nil,
+		insulationThicknessM = 0.012,
+		oxygenKg = 0,
+	}
+end
+
+local function shellVolumeM3(design): number
+	if design.shellMaterialId == nil or design.shellThicknessM <= 0 or design.shellRadiusM <= design.shellThicknessM then
+		return 0
+	end
+	local outer = design.shellRadiusM
+	local inner = outer - design.shellThicknessM
+	return (4 / 3) * math.pi * (outer ^ 3 - inner ^ 3)
+end
+
+local function shellAreaM2(design): number
+	local radius = if design.shellMaterialId then design.shellRadiusM else 0.45
+	return 4 * math.pi * radius * radius
+end
+
+local function insulationVolumeM3(design): number
+	if design.insulationMaterialId == nil or design.insulationThicknessM <= 0 then
+		return 0
+	end
+	return shellAreaM2(design) * design.insulationThicknessM
+end
+
+local function shellMassKg(design): number
+	if design.shellMaterialId == nil then
+		return 0
+	end
+	return materialById(design.shellMaterialId).densityKgM3 * shellVolumeM3(design)
+end
+
+local function insulationMassKg(design): number
+	if design.insulationMaterialId == nil then
+		return 0
+	end
+	return materialById(design.insulationMaterialId).densityKgM3 * insulationVolumeM3(design)
+end
+
+local function oxygenHardwareKg(design): number
+	return design.oxygenKg * TANK_KG_PER_OXYGEN_KG
+end
+
+local function designMassKg(design): number
+	return shellMassKg(design) + insulationMassKg(design) + design.oxygenKg + oxygenHardwareKg(design)
+end
+
+local function stockProblem(design, inventory): string?
+	if design.shellMaterialId ~= nil then
+		local have = inventory[design.shellMaterialId] or 0
+		if shellMassKg(design) > have + 1e-6 then
+			local name = string.lower(materialById(design.shellMaterialId).name)
+			return "That shell is heavier than the " .. name .. " you found. Try a smaller suit."
+		end
+	end
+	if design.insulationMaterialId ~= nil then
+		local have = inventory[design.insulationMaterialId] or 0
+		if insulationMassKg(design) > have + 1e-6 then
+			local name = string.lower(materialById(design.insulationMaterialId).name)
+			return "That wrap is heavier than the " .. name .. " you found. Try a smaller suit."
+		end
+	end
+	local oxygen = inventory.oxygen or 0
+	if design.oxygenKg > oxygen + 1e-6 then
+		return "You packed more oxygen than you found."
+	end
+	return nil
+end
+
+local function isSealed(design): boolean
+	if design.shellMaterialId == nil or design.shellThicknessM <= 0 then
+		return false
+	end
+	if design.shellRadiusM <= design.shellThicknessM then
+		return false
+	end
+	return materialById(design.shellMaterialId).structural
+end
+
+local SIZES = {
+	fits = { shellRadiusM = 0.48, shellThicknessM = 0.0016, insulationThicknessM = 0.012 },
+	bigger = { shellRadiusM = 0.55, shellThicknessM = 0.002, insulationThicknessM = 0.012 },
+	bulky = { shellRadiusM = 0.7, shellThicknessM = 0.004, insulationThicknessM = 0.02 },
+}
+
+return {
+	TANK_KG_PER_OXYGEN_KG = TANK_KG_PER_OXYGEN_KG,
+	SIZES = SIZES,
+	emptyDesign = emptyDesign,
+	shellMassKg = shellMassKg,
+	insulationMassKg = insulationMassKg,
+	designMassKg = designMassKg,
+	stockProblem = stockProblem,
+	isSealed = isSealed,
+}
+]]></string>
+          </Properties>
+        </Item>
+        <Item class="ModuleScript" referent="11">
+          <Properties>
+            <string name="Name">Human</string>
+            <string name="Source"><![CDATA[-- Limits of an unprotected human used to Earth. These are not planet-sheet numbers.
+
+local HUMAN = {
+	massKg = 70,
+	metabolicW = 100,
+	specificHeatJPerKgK = 3470,
+	areaM2 = 1.8,
+	emissivity = 0.97,
+	coreK = 310.15,
+	freezeK = 308.15,
+	burnK = 313.15,
+	comfortMinK = 282,
+	comfortMaxK = 303.15,
+	armstrongPa = 6300,
+	minOxygenPartialPa = 16000,
+	oxygenKgPerDay = 0.84,
+	lungOxygenKg = 0.002,
+}
+
+local STEFAN_BOLTZMANN = 5.670374419e-8
+
+local function celsius(kelvin: number): number
+	return kelvin - 273.15
+end
+
+return {
+	HUMAN = HUMAN,
+	STEFAN_BOLTZMANN = STEFAN_BOLTZMANN,
+	celsius = celsius,
+}
+]]></string>
+          </Properties>
+        </Item>
+        <Item class="ModuleScript" referent="12">
+          <Properties>
+            <string name="Name">Physics</string>
+            <string name="Source"><![CDATA[local ONE_BAR_PA = 100000
+
+-- Roblox tunes the avatar for 196.2. Scale every fact-sheet gravity by Earth,
+-- so the Moon is 1.62/9.82 of a normal Roblox jump, not 1.62 studs/s².
+local ROBLOX_EARTH_GRAVITY = 196.2
+
+local function weightNewtons(massKg: number, gravityMs2: number): number
+	return massKg * gravityMs2
+end
+
+local function pressureAtAltitude(referencePa: number, scaleHeightM: number, altitudeM: number): number
+	return referencePa * math.exp(-altitudeM / scaleHeightM)
+end
+
+local function solarPanelPowerW(irradianceWm2: number, areaM2: number, efficiency: number): number
+	return irradianceWm2 * areaM2 * efficiency
+end
+
+local function safetyFactor(yieldPa: number, stressPa: number): number
+	return yieldPa / stressPa
+end
+
+local function passesSafetyFactor(yieldPa: number, stressPa: number, minSafetyFactor: number): boolean
+	return safetyFactor(yieldPa, stressPa) >= minSafetyFactor
+end
+
+local function freeFallTimeS(heightM: number, gravityMs2: number): number
+	return math.sqrt((2 * heightM) / gravityMs2)
+end
+
+local function gravityStuds(gravityMs2: number, earthGravityMs2: number): number
+	return ROBLOX_EARTH_GRAVITY * (gravityMs2 / earthGravityMs2)
+end
+
+return {
+	ONE_BAR_PA = ONE_BAR_PA,
+	ROBLOX_EARTH_GRAVITY = ROBLOX_EARTH_GRAVITY,
+	weightNewtons = weightNewtons,
+	pressureAtAltitude = pressureAtAltitude,
+	solarPanelPowerW = solarPanelPowerW,
+	safetyFactor = safetyFactor,
+	passesSafetyFactor = passesSafetyFactor,
+	freeFallTimeS = freeFallTimeS,
+	gravityStuds = gravityStuds,
+}
+]]></string>
+          </Properties>
+        </Item>
+        <Item class="ModuleScript" referent="13">
+          <Properties>
+            <string name="Name">Retrieve</string>
+            <string name="Source"><![CDATA[local function dataModule(name: string)
+	if script ~= nil and script.Parent ~= nil and script.Parent.Parent ~= nil then
+		local data = script.Parent.Parent:FindFirstChild("Data")
+		if data ~= nil then
+			local child = data:FindFirstChild(name)
+			if child ~= nil then
+				return require(child)
+			end
+		end
+	end
+	return require("../Data/" .. name)
+end
+
+local Catalog = dataModule("Catalog")
+local planetById = Catalog.planetById
+
+local CAUSE_TAGS = {
+	pressure = { "pressure", "oxygen" },
+	oxygen = { "oxygen" },
+	burn = { "temperature" },
+	freeze = { "temperature" },
+	crush = { "pressure" },
+	survive = { "pressure", "temperature", "oxygen" },
+}
+
+local function hasTag(tags, wanted)
+	for _, tag in tags do
+		for _, need in wanted do
+			if tag == need then
+				return true
+			end
+		end
+	end
+	return false
+end
+
+local function chunksFor(planet)
+	local chunks = {
+		{
+			id = planet.id .. "-pressure",
+			planetId = planet.id,
+			tags = { "pressure" },
+			text = planet.referencePressure.transcribedFrom,
+			sourceUrl = planet.sourceUrl,
+		},
+		{
+			id = planet.id .. "-air",
+			planetId = planet.id,
+			tags = { "oxygen", "pressure" },
+			text = planet.atmosphereTranscribedFrom,
+			sourceUrl = planet.sourceUrl,
+		},
+	}
+	for index, reading in planet.temperatures do
+		table.insert(chunks, {
+			id = planet.id .. "-temp-" .. tostring(index),
+			planetId = planet.id,
+			tags = { "temperature" },
+			text = reading.transcribedFrom,
+			sourceUrl = planet.sourceUrl,
+		})
+	end
+	table.insert(chunks, {
+		id = planet.id .. "-gravity",
+		planetId = planet.id,
+		tags = { "gravity" },
+		text = planet.gravityTranscribedFrom,
+		sourceUrl = planet.sourceUrl,
+	})
+	return chunks
+end
+
+local function filterChunks(chunks, tags)
+	local kept = {}
+	for _, chunk in chunks do
+		if hasTag(chunk.tags, tags) then
+			table.insert(kept, chunk)
+		end
+	end
+	return kept
+end
+
+local function take(list, count)
+	local out = {}
+	for index, item in list do
+		if index > count then
+			break
+		end
+		table.insert(out, item)
+	end
+	return out
+end
+
+-- Planet lines for this outcome, then Earth's matching lines. No model invents a number.
+local function retrieve(planet, cause: string)
+	local tags = CAUSE_TAGS[cause]
+	local here = filterChunks(chunksFor(planet), tags)
+	if planet.id == "earth" then
+		return take(here, 4)
+	end
+	local home = filterChunks(chunksFor(planetById("earth")), tags)
+	local combined = {}
+	for _, chunk in here do
+		table.insert(combined, chunk)
+	end
+	for _, chunk in home do
+		table.insert(combined, chunk)
+	end
+	return take(combined, 4)
+end
+
+return {
+	retrieve = retrieve,
+}
+]]></string>
+          </Properties>
+        </Item>
+        <Item class="ModuleScript" referent="14">
+          <Properties>
+            <string name="Name">Survival</string>
+            <string name="Source"><![CDATA[local function sibling(name: string)
+	if script ~= nil and script.Parent ~= nil then
+		local child = script.Parent:FindFirstChild(name)
+		if child ~= nil then
+			return require(child)
+		end
+	end
+	return require("./" .. name)
+end
+
+local function dataModule(name: string)
+	if script ~= nil and script.Parent ~= nil and script.Parent.Parent ~= nil then
+		local data = script.Parent.Parent:FindFirstChild("Data")
+		if data ~= nil then
+			local child = data:FindFirstChild(name)
+			if child ~= nil then
+				return require(child)
+			end
+		end
+	end
+	return require("../Data/" .. name)
+end
+
+local Catalog = dataModule("Catalog")
+local planetById = Catalog.planetById
+local materialById = Catalog.materialById
+local Design = sibling("Design")
+local isSealed = Design.isSealed
+local Human = sibling("Human")
+local HUMAN = Human.HUMAN
+local STEFAN_BOLTZMANN = Human.STEFAN_BOLTZMANN
+local celsius = Human.celsius
+
+local MISSION_SECONDS = 20 * 60
+local VACUUM_FAIL_S = 90
+
+local function outsidePressurePa(planet): number
+	if planet.referencePressure.value ~= nil then
+		return planet.referencePressure.value
+	end
+	if planet.referencePressure.max ~= nil then
+		return planet.referencePressure.max
+	end
+	return 0
+end
+
+local function oxygenFraction(planet): number
+	local text = string.lower(planet.atmosphereComposition)
+	local match = string.match(text, "(%d+%.?%d*)%% oxygen")
+	if match == nil then
+		return 0
+	end
+	return tonumber(match) / 100
+end
+
+local function extreme(reading, side: string): number?
+	if side == "hot" then
+		return reading.maxK or reading.kelvin
+	end
+	return reading.minK or reading.kelvin
+end
+
+local function exposure(planet, side: string)
+	local best = nil
+	for _, reading in planet.temperatures do
+		local kelvin = extreme(reading, side)
+		if kelvin ~= nil and (best == nil or (side == "hot" and kelvin > best.kelvin) or (side ~= "hot" and kelvin < best.kelvin)) then
+			best = { kelvin = kelvin, transcribedFrom = reading.transcribedFrom }
+		end
+	end
+	if best == nil then
+		return { kelvin = HUMAN.coreK, transcribedFrom = "This sheet does not list a temperature." }
+	end
+	return best
+end
+
+local function shellSafetyFactor(design, outsidePa: number): number?
+	if not isSealed(design) or design.shellMaterialId == nil then
+		return nil
+	end
+	local material = materialById(design.shellMaterialId)
+	local earthPa = planetById("earth").referencePressure.value or 101400
+	local deltaPa = math.abs(outsidePa - earthPa)
+	local radius = design.shellRadiusM - design.shellThicknessM
+	local stress = (deltaPa * radius) / (2 * design.shellThicknessM)
+	if stress <= 0 then
+		return math.huge
+	end
+	return material.yieldPa / stress
+end
+
+local function breathableAir(planet, outsidePa: number): boolean
+	return oxygenFraction(planet) * outsidePa >= HUMAN.minOxygenPartialPa
+end
+
+local function earthlikeComfort(planet, outsidePa: number, ambientK: number): boolean
+	return breathableAir(planet, outsidePa)
+		and outsidePa >= HUMAN.armstrongPa
+		and ambientK >= HUMAN.comfortMinK
+		and ambientK <= HUMAN.comfortMaxK
+end
+
+local function heatFlowW(design, sealed: boolean, outsidePa: number, bodyK: number, ambientK: number): number
+	local area = HUMAN.areaM2
+	if not sealed and outsidePa < 100 then
+		return HUMAN.emissivity * STEFAN_BOLTZMANN * area * (ambientK ^ 4 - bodyK ^ 4)
+	end
+	local wrap = nil
+	if design.insulationMaterialId ~= nil and design.insulationThicknessM > 0 then
+		wrap = materialById(design.insulationMaterialId)
+	end
+	if sealed and wrap ~= nil and ambientK < wrap.meltingK then
+		return (wrap.conductivity * area * (ambientK - bodyK)) / design.insulationThicknessM
+	end
+	if sealed and design.shellMaterialId ~= nil and design.shellThicknessM > 0 then
+		local shell = materialById(design.shellMaterialId)
+		return (shell.conductivity * area * (ambientK - bodyK)) / design.shellThicknessM
+	end
+	return 10 * area * (ambientK - bodyK)
+end
+
+local function initialVitals(design)
+	return {
+		bodyTempK = HUMAN.coreK,
+		oxygenKg = design.oxygenKg + HUMAN.lungOxygenKg,
+		elapsedS = 0,
+		alive = true,
+		cause = nil,
+	}
+end
+
+local function stepVitals(vitals, design, planet, minSafetyFactor: number, side: string, dt: number)
+	if not vitals.alive or dt <= 0 then
+		return vitals
+	end
+	local outsidePa = outsidePressurePa(planet)
+	local ambientK = exposure(planet, side).kelvin
+	local sealed = isSealed(design)
+	local cause = nil
+	local bodyTempK = vitals.bodyTempK
+	local oxygenKg = vitals.oxygenKg
+
+	if not sealed and outsidePa < HUMAN.armstrongPa then
+		if vitals.elapsedS + dt >= VACUUM_FAIL_S then
+			cause = "pressure"
+		end
+	elseif sealed and design.shellMaterialId ~= nil and ambientK >= materialById(design.shellMaterialId).meltingK then
+		cause = "burn"
+	elseif sealed then
+		local factor = shellSafetyFactor(design, outsidePa)
+		if factor ~= nil and factor < minSafetyFactor then
+			cause = "crush"
+		end
+	end
+
+	if cause == nil then
+		local regulating = (not sealed) and earthlikeComfort(planet, outsidePa, ambientK)
+		if not regulating then
+			local flow = heatFlowW(design, sealed, outsidePa, bodyTempK, ambientK) + HUMAN.metabolicW
+			bodyTempK += (flow * dt) / (HUMAN.massKg * HUMAN.specificHeatJPerKgK)
+		end
+		if not (breathableAir(planet, outsidePa) and not sealed) then
+			oxygenKg -= (HUMAN.oxygenKgPerDay / 86400) * dt
+			if oxygenKg <= 0 then
+				oxygenKg = 0
+				cause = "oxygen"
+			end
+		end
+		if bodyTempK >= HUMAN.burnK and cause == nil then
+			cause = "burn"
+		end
+		if bodyTempK <= HUMAN.freezeK and cause == nil then
+			cause = "freeze"
+		end
+	end
+
+	return {
+		bodyTempK = bodyTempK,
+		oxygenKg = math.max(0, oxygenKg),
+		elapsedS = vitals.elapsedS + dt,
+		alive = cause == nil,
+		cause = cause,
+	}
+end
+
+local function runMission(design, planet, minSafetyFactor: number, side: string)
+	local state = initialVitals(design)
+	while state.alive and state.elapsedS < MISSION_SECONDS do
+		local dt = math.min(5, MISSION_SECONDS - state.elapsedS)
+		state = stepVitals(state, design, planet, minSafetyFactor, side, dt)
+	end
+	return state
+end
+
+local function deathTitle(cause: string): string
+	if cause == "pressure" then
+		return "The air pressure gave out."
+	elseif cause == "oxygen" then
+		return "You ran out of oxygen."
+	elseif cause == "burn" then
+		return "You burned."
+	elseif cause == "freeze" then
+		return "You froze."
+	end
+	return "The shell was crushed."
+end
+
+local function deathDetail(planet, side: string, cause: string): string
+	local earth = planetById("earth")
+	local stay = exposure(planet, side)
+	local earthAverage = nil
+	for _, reading in earth.temperatures do
+		if reading.kelvin ~= nil then
+			earthAverage = reading.kelvin
+			break
+		end
+	end
+	if earthAverage == nil then
+		earthAverage = exposure(earth, "hot").kelvin
+	end
+	local earthAir = "Your body is used to Earth: about "
+		.. string.format("%.0f", celsius(earthAverage))
+		.. " °C, "
+		.. earth.referencePressure.transcribedFrom
+		.. ", and air that is "
+		.. string.format("%d", math.floor(oxygenFraction(earth) * 100 + 0.5))
+		.. "% oxygen."
+	if cause == "pressure" then
+		return earthAir
+			.. " Here the pressure is too low to keep a human body intact (the Armstrong limit is about 6.3 kPa). "
+			.. planet.referencePressure.transcribedFrom
+	elseif cause == "oxygen" then
+		return earthAir
+			.. " This stay does not give you that oxygen, and the bottles you packed ran out. A person needs about "
+			.. tostring(HUMAN.oxygenKgPerDay)
+			.. " kg per day."
+	elseif cause == "burn" then
+		return earthAir
+			.. " Your core climbed through "
+			.. string.format("%.0f", celsius(HUMAN.burnK))
+			.. " °C. The place you stood was "
+			.. tostring(stay.kelvin)
+			.. " K. "
+			.. stay.transcribedFrom
+	elseif cause == "freeze" then
+		return earthAir
+			.. " Your core fell through "
+			.. string.format("%.0f", celsius(HUMAN.freezeK))
+			.. " °C. The place you stood was "
+			.. tostring(stay.kelvin)
+			.. " K. "
+			.. stay.transcribedFrom
+	end
+	return earthAir .. " Outside pressure overcame the shell. " .. planet.referencePressure.transcribedFrom
+end
+
+local function survived(vitals): boolean
+	return vitals.alive and vitals.elapsedS >= MISSION_SECONDS - 1e-6
+end
+
+local function kidResult(design, planet, minSafetyFactor: number, side: string): string
+	local where = if side == "hot" then "Hot side" else "Cold side"
+	local result = runMission(design, planet, minSafetyFactor, side)
+	if survived(result) then
+		return where .. ": you would last."
+	elseif result.cause == "pressure" then
+		return where .. ": the air would vanish."
+	elseif result.cause == "oxygen" then
+		return where .. ": you would run out of air."
+	elseif result.cause == "burn" then
+		return where .. ": you would get too hot."
+	elseif result.cause == "freeze" then
+		return where .. ": you would freeze."
+	end
+	return where .. ": the shell would be crushed."
+end
+
+return {
+	MISSION_SECONDS = MISSION_SECONDS,
+	VACUUM_FAIL_S = VACUUM_FAIL_S,
+	outsidePressurePa = outsidePressurePa,
+	oxygenFraction = oxygenFraction,
+	exposure = exposure,
+	shellSafetyFactor = shellSafetyFactor,
+	initialVitals = initialVitals,
+	stepVitals = stepVitals,
+	runMission = runMission,
+	deathTitle = deathTitle,
+	deathDetail = deathDetail,
+	survived = survived,
+	kidResult = kidResult,
+	celsius = celsius,
+}
+]]></string>
+          </Properties>
+        </Item>
+      </Item>
+    </Item>
+  </Item>
+  <Item class="ServerScriptService" referent="15">
+    <Properties>
+      <string name="Name">ServerScriptService</string>
+    </Properties>
+    <Item class="Script" referent="16">
+      <Properties>
+        <string name="Name">CODAG</string>
+        <token name="RunContext">0</token>
+        <string name="Source"><![CDATA[-- Portions of CODAG.0 were written with Cursor AI.
+-- Planet numbers are the NSSDC fact sheets. Roblox gravity is those values scaled to the avatar.
+
+local Players = game:GetService("Players")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local RunService = game:GetService("RunService")
+local Lighting = game:GetService("Lighting")
+
+local shared = ReplicatedStorage:WaitForChild("CODAG")
+local Catalog = require(shared.Data.Catalog)
+local Sources = require(shared.Data.Sources)
+local Design = require(shared.Sim.Design)
+local Survival = require(shared.Sim.Survival)
+local Retrieve = require(shared.Sim.Retrieve)
+local Physics = require(shared.Sim.Physics)
+local World = require(script.World)
+
+Catalog.assertFactSheetRecords(Catalog.PLANETS)
+
+local world = World.build()
+local earthG = Catalog.planetById("earth").gravityMs2
+local TIME_SCALE = 30
+
+local function remote(name: string): RemoteEvent
+	local folder = shared:FindFirstChild("Remotes")
+	if folder == nil then
+		folder = Instance.new("Folder")
+		folder.Name = "Remotes"
+		folder.Parent = shared
+	end
+	local event = Instance.new("RemoteEvent")
+	event.Name = name
+	event.Parent = folder
+	return event
+end
+
+local State = remote("State")
+local Ready = remote("Ready")
+local Debrief = remote("Debrief")
+local Place = remote("Place")
+local ClearSlot = remote("ClearSlot")
+local SetSize = remote("SetSize")
+local Depart = remote("Depart")
+local Abort = remote("Abort")
+
+local sessions = {}
+
+local function emptyInventory()
+	local inventory = {}
+	for _, material in Catalog.MATERIALS do
+		inventory[material.id] = 0
+	end
+	return inventory
+end
+
+local function applyLook(planetId: string)
+	local look = world.look[planetId] or world.look.earth
+	Lighting.ClockTime = look.clock
+	Lighting.Ambient = look.sky
+	Lighting.OutdoorAmbient = look.sky
+	Lighting.FogColor = look.sky
+	Lighting.FogStart = if planetId == "earth" then 400 else 40
+	Lighting.FogEnd = if planetId == "earth" then 900 else 180
+end
+
+local function gravityFor(planetId: string): number
+	return Physics.gravityStuds(Catalog.planetById(planetId).gravityMs2, earthG)
+end
+
+local function unlocked(session, planetId: string): boolean
+	local previous = nil
+	for _, id in Sources.DESTINATION_ORDER do
+		if id == planetId then
+			return previous == nil or session.clears[previous] == true
+		end
+		previous = id
+	end
+	return false
+end
+
+local function publicDesign(design)
+	return {
+		shellMaterialId = design.shellMaterialId or "",
+		shellRadiusM = design.shellRadiusM,
+		shellThicknessM = design.shellThicknessM,
+		insulationMaterialId = design.insulationMaterialId or "",
+		insulationThicknessM = design.insulationThicknessM,
+		oxygenKg = design.oxygenKg,
+	}
+end
+
+local function sendState(player: Player)
+	local session = sessions[player]
+	if session == nil then
+		return
+	end
+	local clears = {}
+	for id, did in session.clears do
+		if did then
+			table.insert(clears, id)
+		end
+	end
+	State:FireClient(player, {
+		inventory = session.inventory,
+		design = publicDesign(session.design),
+		hint = session.hint,
+		problem = session.problem or "",
+		clears = clears,
+	})
+end
+
+local function wear(player: Player)
+	local session = sessions[player]
+	local character = player.Character
+	if session == nil or character == nil then
+		return
+	end
+	local old = character:FindFirstChild("CODAGSuit")
+	if old then
+		old:Destroy()
+	end
+	local root = character:FindFirstChild("HumanoidRootPart")
+	if root == nil then
+		return
+	end
+	local model = Instance.new("Model")
+	model.Name = "CODAGSuit"
+	model.Parent = character
+	local function shellPart(materialId: string?, scale: number, transparency: number)
+		if materialId == nil or materialId == "" then
+			return
+		end
+		local piece = Instance.new("Part")
+		piece.Name = materialId
+		piece.Shape = Enum.PartType.Ball
+		piece.Size = Vector3.new(4.2, 5.4, 4.2) * scale
+		piece.Color = world.hexColor(Catalog.materialById(materialId).color)
+		piece.Transparency = transparency
+		piece.CanCollide = false
+		piece.Massless = true
+		piece.CFrame = root.CFrame
+		piece.Parent = model
+		local weld = Instance.new("WeldConstraint")
+		weld.Part0 = root
+		weld.Part1 = piece
+		weld.Parent = piece
+	end
+	shellPart(session.design.shellMaterialId, 1, 0.55)
+	shellPart(session.design.insulationMaterialId, 1.18, 0.45)
+	if session.design.oxygenKg > 0 then
+		local bottle = Instance.new("Part")
+		bottle.Name = "Oxygen"
+		bottle.Shape = Enum.PartType.Cylinder
+		bottle.Size = Vector3.new(1.4, 0.5, 0.5)
+		bottle.Color = Color3.fromRGB(196, 71, 58)
+		bottle.CanCollide = false
+		bottle.Massless = true
+		bottle.CFrame = root.CFrame * CFrame.new(1.6, 0, 0) * CFrame.Angles(0, 0, math.rad(90))
+		bottle.Parent = model
+		local weld = Instance.new("WeldConstraint")
+		weld.Part0 = root
+		weld.Part1 = bottle
+		weld.Parent = bottle
+	end
+end
+
+local function tuneJump(character: Model)
+	local humanoid = character:FindFirstChildOfClass("Humanoid")
+	if humanoid then
+		humanoid.UseJumpPower = true
+		humanoid.JumpPower = 50
+	end
+end
+
+local function home(player: Player)
+	local session = sessions[player]
+	if session == nil then
+		return
+	end
+	session.mission = nil
+	workspace.Gravity = gravityFor("earth")
+	applyLook("earth")
+	local character = player.Character
+	local root = character and character:FindFirstChild("HumanoidRootPart")
+	if root then
+		root.CFrame = world.spawn.CFrame + Vector3.new(0, 4, 0)
+	end
+	player:SetAttribute("InMission", false)
+end
+
+local function finishMission(player: Player)
+	local session = sessions[player]
+	if session == nil or session.mission == nil then
+		return
+	end
+	local mission = session.mission
+	session.mission = nil
+	player:SetAttribute("InMission", false)
+	local madeIt = Survival.survived(mission.vitals)
+	if madeIt then
+		session.clears[mission.planetId] = true
+	end
+	local cause = if madeIt then "survive" else (mission.vitals.cause or "oxygen")
+	local planet = Catalog.planetById(mission.planetId)
+	local facts = Retrieve.retrieve(planet, cause)
+	local lines = {}
+	for _, fact in facts do
+		table.insert(lines, {
+			text = fact.text,
+			sourceUrl = fact.sourceUrl,
+			body = Catalog.planetById(fact.planetId).name,
+		})
+	end
+	Debrief:FireClient(player, {
+		planetId = mission.planetId,
+		planetName = planet.name,
+		difficultyId = mission.difficultyId,
+		side = mission.side,
+		survived = madeIt,
+		title = if madeIt then "Twenty minutes on " .. planet.name .. "." else Survival.deathTitle(cause),
+		detail = if madeIt
+			then "Your core stayed near 37 °C and you still had oxygen."
+			else Survival.deathDetail(planet, mission.side, cause),
+		facts = lines,
+	})
+	sendState(player)
+end
+
+local function stepMission(player: Player, realDt: number)
+	local session = sessions[player]
+	local mission = session and session.mission
+	if mission == nil or not mission.vitals.alive then
+		return
+	end
+	local dt = math.clamp(realDt, 0, 0.05) * TIME_SCALE
+	mission.vitals = Survival.stepVitals(
+		mission.vitals,
+		session.design,
+		Catalog.planetById(mission.planetId),
+		mission.minSafetyFactor,
+		mission.side,
+		dt
+	)
+	local vitals = mission.vitals
+	local sealed = Design.isSealed(session.design)
+	local held = if sealed then 100 else math.max(0, 100 * (1 - vitals.elapsedS / Survival.VACUUM_FAIL_S))
+	player:SetAttribute("InMission", true)
+	player:SetAttribute("MissionClock", vitals.elapsedS)
+	player:SetAttribute("CoreC", Survival.celsius(vitals.bodyTempK))
+	player:SetAttribute("OxygenKg", vitals.oxygenKg)
+	player:SetAttribute("AirHeld", held)
+	player:SetAttribute("Alive", vitals.alive)
+	player:SetAttribute("CauseTitle", if vitals.cause then Survival.deathTitle(vitals.cause) else "")
+	if not vitals.alive or Survival.survived(vitals) then
+		finishMission(player)
+	end
+end
+
+local function depart(player: Player, planetId: string, difficultyId: string, side: string)
+	local session = sessions[player]
+	if session == nil or session.mission ~= nil then
+		return
+	end
+	if side ~= "hot" and side ~= "cold" then
+		return
+	end
+	if not unlocked(session, planetId) then
+		session.hint = "That planet is still locked."
+		sendState(player)
+		return
+	end
+	local problem = Design.stockProblem(session.design, session.inventory)
+	if problem ~= nil then
+		session.problem = problem
+		session.hint = problem
+		sendState(player)
+		return
+	end
+	local profile = Catalog.difficultyById(difficultyId)
+	local planet = Catalog.planetById(planetId)
+	session.mission = {
+		planetId = planetId,
+		difficultyId = difficultyId,
+		side = side,
+		minSafetyFactor = profile.minSafetyFactor,
+		vitals = Survival.initialVitals(session.design),
+	}
+	workspace.Gravity = gravityFor(planetId)
+	applyLook(planetId)
+	local character = player.Character
+	local root = character and character:FindFirstChild("HumanoidRootPart")
+	local pad = world.planetPads[planetId]
+	if root and pad then
+		root.CFrame = pad.CFrame + Vector3.new(0, 8, 0)
+	end
+	player:SetAttribute("MissionPlanet", planet.name)
+	player:SetAttribute("MissionSide", side)
+	player:SetAttribute("MissionDifficulty", profile.label)
+	stepMission(player, 0)
+end
+
+local function place(player: Player, materialId: string, slot: string)
+	local session = sessions[player]
+	if session == nil then
+		return
+	end
+	if (session.inventory[materialId] or 0) <= 0 then
+		session.hint = "You have not found that yet."
+		sendState(player)
+		return
+	end
+	local material = Catalog.materialById(materialId)
+	local design = session.design
+	if slot == "air" then
+		if materialId ~= "oxygen" then
+			session.hint = "Only the red bottles go on Air."
+		else
+			design.oxygenKg = session.inventory.oxygen or 0
+			session.hint = "Bottles packed. That is all the air you found."
+		end
+	elseif slot == "shell" then
+		if materialId == "oxygen" then
+			session.hint = "Bottles go on Air."
+		elseif not material.structural then
+			session.hint = material.name .. " cannot hold air. Put it on the wrap."
+		else
+			design.shellMaterialId = materialId
+			session.hint = material.name .. " is the hard shell. It keeps your air in."
+		end
+	elseif slot == "wrap" then
+		if materialId == "oxygen" or material.structural then
+			session.hint = if materialId == "oxygen" then "Bottles go on Air." else material.name .. " is hard. It belongs on the shell."
+		else
+			design.insulationMaterialId = materialId
+			session.hint = material.name .. " is the wrap. It slows the heat."
+		end
+	end
+	session.problem = Design.stockProblem(design, session.inventory)
+	wear(player)
+	sendState(player)
+end
+
+local function collect(player: Player, materialId: string)
+	local session = sessions[player]
+	local cache = world.caches[materialId]
+	if session == nil or cache == nil then
+		return
+	end
+	if (session.inventory[materialId] or 0) > 0 then
+		return
+	end
+	local material = Catalog.materialById(materialId)
+	session.inventory[materialId] = material.foundKg
+	cache.prompt.Enabled = false
+	cache.part.Transparency = 0.75
+	local token = cache.part:Clone()
+	token.Transparency = 0
+	token.Size = Vector3.new(3, 2, 3)
+	token.CFrame = world.pads.shell.CFrame * CFrame.new(0, 3, 6)
+	token.Anchored = true
+	token:SetAttribute("MaterialId", materialId)
+	local oldPrompt = token:FindFirstChildOfClass("ProximityPrompt")
+	if oldPrompt then
+		oldPrompt:Destroy()
+	end
+	token.Parent = world.bench
+	local homeCFrame = token.CFrame
+	local created, drag = pcall(function()
+		return Instance.new("DragDetector")
+	end)
+	if created and drag ~= nil then
+		drag.Parent = token
+		drag.DragEnd:Connect(function(who: Player)
+			local nearest = nil
+			local best = 12
+			for _, pad in pairs(world.pads) do
+				local distance = (pad.Position - token.Position).Magnitude
+				if distance < best then
+					nearest = pad
+					best = distance
+				end
+			end
+			token.CFrame = homeCFrame
+			if nearest ~= nil and typeof(who) == "Instance" then
+				place(who, materialId, nearest:GetAttribute("Slot"))
+			end
+		end)
+	end
+	session.hint = "Picked up " .. material.name .. ". Drag it onto Shell, Wrap, or Air."
+	sendState(player)
+end
+
+local function startSession(player: Player)
+	sessions[player] = {
+		inventory = emptyInventory(),
+		design = Design.emptyDesign(),
+		clears = {},
+		hint = "Pick up a pile, then drag it onto a pad.",
+		problem = nil,
+		mission = nil,
+	}
+	player:SetAttribute("InMission", false)
+	sendState(player)
+end
+
+for _, cache in world.caches do
+	cache.prompt.Triggered:Connect(function(player)
+		collect(player, cache.part:GetAttribute("MaterialId"))
+	end)
+end
+
+Place.OnServerEvent:Connect(function(player, materialId, slot)
+	if typeof(materialId) ~= "string" or typeof(slot) ~= "string" then
+		return
+	end
+	place(player, materialId, slot)
+end)
+
+ClearSlot.OnServerEvent:Connect(function(player, slot)
+	local session = sessions[player]
+	if session == nil or typeof(slot) ~= "string" then
+		return
+	end
+	if slot == "shell" then
+		session.design.shellMaterialId = nil
+	elseif slot == "wrap" then
+		session.design.insulationMaterialId = nil
+	elseif slot == "air" then
+		session.design.oxygenKg = 0
+	end
+	session.problem = Design.stockProblem(session.design, session.inventory)
+	session.hint = "Took it off."
+	wear(player)
+	sendState(player)
+end)
+
+SetSize.OnServerEvent:Connect(function(player, sizeId)
+	local session = sessions[player]
+	local size = Design.SIZES[sizeId]
+	if session == nil or size == nil then
+		return
+	end
+	session.design.shellRadiusM = size.shellRadiusM
+	session.design.shellThicknessM = size.shellThicknessM
+	session.design.insulationThicknessM = size.insulationThicknessM
+	session.problem = Design.stockProblem(session.design, session.inventory)
+	session.hint = "Suit size changed. The weight is calculated from that."
+	sendState(player)
+end)
+
+Depart.OnServerEvent:Connect(function(player, planetId, difficultyId, side)
+	if typeof(planetId) ~= "string" or typeof(difficultyId) ~= "string" or typeof(side) ~= "string" then
+		return
+	end
+	depart(player, planetId, difficultyId, side)
+end)
+
+Abort.OnServerEvent:Connect(function(player)
+	home(player)
+	sendState(player)
+end)
+
+local function bind(player: Player)
+	startSession(player)
+	player.CharacterAdded:Connect(function(character)
+		tuneJump(character)
+		wear(player)
+		local session = sessions[player]
+		if session and session.mission then
+			home(player)
+		end
+	end)
+	if player.Character then
+		tuneJump(player.Character)
+	end
+end
+
+Ready.OnServerEvent:Connect(function(player)
+	if sessions[player] == nil then
+		bind(player)
+	end
+	sendState(player)
+end)
+
+Players.PlayerAdded:Connect(bind)
+
+Players.PlayerRemoving:Connect(function(player)
+	sessions[player] = nil
+	workspace.Gravity = gravityFor("earth")
+	applyLook("earth")
+end)
+
+for _, player in Players:GetPlayers() do
+	bind(player)
+end
+
+workspace.Gravity = gravityFor("earth")
+applyLook("earth")
+
+RunService.Heartbeat:Connect(function(dt)
+	for player, session in pairs(sessions) do
+		if session.mission ~= nil then
+			stepMission(player, dt)
+		end
+	end
+end)
+]]></string>
+      </Properties>
+      <Item class="ModuleScript" referent="17">
+        <Properties>
+          <string name="Name">World</string>
+          <string name="Source"><![CDATA[local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local Catalog = require(ReplicatedStorage:WaitForChild("CODAG").Data.Catalog)
+
+local LOOK = {
+	earth = { ground = Color3.fromRGB(111, 143, 98), sky = Color3.fromRGB(158, 182, 201), clock = 14 },
+	moon = { ground = Color3.fromRGB(194, 187, 178), sky = Color3.fromRGB(28, 26, 23), clock = 0 },
+	mercury = { ground = Color3.fromRGB(177, 151, 122), sky = Color3.fromRGB(58, 42, 34), clock = 0 },
+	venus = { ground = Color3.fromRGB(198, 161, 90), sky = Color3.fromRGB(196, 138, 58), clock = 12 },
+	mars = { ground = Color3.fromRGB(181, 101, 69), sky = Color3.fromRGB(196, 122, 85), clock = 10 },
+	jupiter = { ground = Color3.fromRGB(201, 176, 137), sky = Color3.fromRGB(138, 106, 69), clock = 9 },
+	saturn = { ground = Color3.fromRGB(210, 192, 147), sky = Color3.fromRGB(194, 163, 106), clock = 9 },
+	uranus = { ground = Color3.fromRGB(127, 154, 168), sky = Color3.fromRGB(110, 143, 152), clock = 6 },
+	neptune = { ground = Color3.fromRGB(63, 111, 152), sky = Color3.fromRGB(29, 53, 80), clock = 2 },
+}
+
+local function hexColor(value: string): Color3
+	local r = tonumber(string.sub(value, 2, 3), 16) or 200
+	local g = tonumber(string.sub(value, 4, 5), 16) or 200
+	local b = tonumber(string.sub(value, 6, 7), 16) or 200
+	return Color3.fromRGB(r, g, b)
+end
+
+local function part(parent: Instance, name: string, size: Vector3, cframe: CFrame, color: Color3): Part
+	local piece = Instance.new("Part")
+	piece.Name = name
+	piece.Size = size
+	piece.CFrame = cframe
+	piece.Color = color
+	piece.Anchored = true
+	piece.TopSurface = Enum.SurfaceType.Smooth
+	piece.BottomSurface = Enum.SurfaceType.Smooth
+	piece.Parent = parent
+	return piece
+end
+
+local function label(adornee: BasePart, text: string)
+	local billboard = Instance.new("BillboardGui")
+	billboard.Size = UDim2.fromOffset(180, 48)
+	billboard.StudsOffset = Vector3.new(0, 3, 0)
+	billboard.AlwaysOnTop = true
+	billboard.Parent = adornee
+	local title = Instance.new("TextLabel")
+	title.BackgroundTransparency = 1
+	title.Size = UDim2.fromScale(1, 1)
+	title.Font = Enum.Font.GothamBold
+	title.TextColor3 = Color3.fromRGB(244, 239, 230)
+	title.TextStrokeTransparency = 0.4
+	title.TextScaled = true
+	title.Text = text
+	title.Parent = billboard
+end
+
+local function prompt(adornee: BasePart, action: string, objectText: string): ProximityPrompt
+	local use = Instance.new("ProximityPrompt")
+	use.ActionText = action
+	use.ObjectText = objectText
+	use.HoldDuration = 0
+	use.MaxActivationDistance = 12
+	use.RequiresLineOfSight = false
+	use.Parent = adornee
+	return use
+end
+
+local function build()
+	local folder = Instance.new("Folder")
+	folder.Name = "CODAGWorld"
+	folder.Parent = workspace
+
+	local earth = Instance.new("Folder")
+	earth.Name = "Earth"
+	earth.Parent = folder
+
+	part(earth, "Ground", Vector3.new(240, 2, 240), CFrame.new(0, -1, 0), LOOK.earth.ground)
+
+	local spawn = Instance.new("SpawnLocation")
+	spawn.Name = "EarthSpawn"
+	spawn.Size = Vector3.new(8, 1, 8)
+	spawn.CFrame = CFrame.new(0, 1, 18)
+	spawn.Color = Color3.fromRGB(224, 160, 69)
+	spawn.Anchored = true
+	spawn.Neutral = true
+	spawn.Parent = earth
+	label(spawn, "Earth")
+
+	local shed = part(earth, "Shed", Vector3.new(14, 8, 10), CFrame.new(0, 4, -30), Color3.fromRGB(90, 62, 40))
+	label(shed, "Workshop yard")
+
+	local caches = {}
+	for _, material in Catalog.MATERIALS do
+		local x = material.position[1] * 8
+		local z = material.position[3] * 8
+		local pile = part(earth, material.id, Vector3.new(4, 3, 4), CFrame.new(x, 2.5, z), hexColor(material.color))
+		pile:SetAttribute("MaterialId", material.id)
+		label(pile, material.name)
+		local use = prompt(pile, "Pick up", material.name)
+		caches[material.id] = { part = pile, prompt = use }
+	end
+
+	local padsFolder = Instance.new("Folder")
+	padsFolder.Name = "Pads"
+	padsFolder.Parent = earth
+	local slotNames = { "shell", "wrap", "air" }
+	local slotTitles = { shell = "Shell", wrap = "Wrap", air = "Air" }
+	local pads = {}
+	for index, slot in slotNames do
+		local pad = part(padsFolder, slot, Vector3.new(8, 1, 8), CFrame.new(-28 + (index - 1) * 12, 1, -18), Color3.fromRGB(34, 28, 22))
+		pad:SetAttribute("Slot", slot)
+		label(pad, slotTitles[slot])
+		pads[slot] = pad
+	end
+
+	local bench = part(earth, "Bench", Vector3.new(28, 1, 8), CFrame.new(-16, 1, -8), Color3.fromRGB(58, 49, 40))
+	local buildPrompt = prompt(bench, "Build", "Suit")
+	label(bench, "Drag materials onto the pads")
+
+	local destinations = Instance.new("Folder")
+	destinations.Name = "Destinations"
+	destinations.Parent = folder
+	local planetPads = {}
+	for index, planet in Catalog.PLANETS do
+		if planet.id ~= "earth" then
+			local look = LOOK[planet.id] or LOOK.moon
+			local pad = part(
+				destinations,
+				planet.id,
+				Vector3.new(80, 2, 80),
+				CFrame.new((index - 1) * 120, -1, -280),
+				look.ground
+			)
+			pad:SetAttribute("PlanetId", planet.id)
+			label(pad, planet.name)
+			planetPads[planet.id] = pad
+		end
+	end
+
+	return {
+		look = LOOK,
+		spawn = spawn,
+		caches = caches,
+		pads = pads,
+		bench = bench,
+		buildPrompt = buildPrompt,
+		planetPads = planetPads,
+		hexColor = hexColor,
+	}
+end
+
+return {
+	build = build,
+}
+]]></string>
+        </Properties>
+      </Item>
+    </Item>
+  </Item>
+  <Item class="StarterPlayer" referent="18">
+    <Properties>
+      <string name="Name">StarterPlayer</string>
+    </Properties>
+    <Item class="StarterPlayerScripts" referent="19">
+      <Properties>
+        <string name="Name">StarterPlayerScripts</string>
+      </Properties>
+      <Item class="LocalScript" referent="20">
+        <Properties>
+          <string name="Name">CODAG</string>
+          <string name="Source"><![CDATA[local Players = game:GetService("Players")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+
+local shared = ReplicatedStorage:WaitForChild("CODAG")
+local Catalog = require(shared.Data.Catalog)
+local Sources = require(shared.Data.Sources)
+local Survival = require(shared.Sim.Survival)
+local player = Players.LocalPlayer
+local remotes = shared:WaitForChild("Remotes")
+
+local function event(name: string): RemoteEvent
+	return remotes:WaitForChild(name)
+end
+
+local Place = event("Place")
+local ClearSlot = event("ClearSlot")
+local SetSize = event("SetSize")
+local Depart = event("Depart")
+local Abort = event("Abort")
+local State = event("State")
+local Debrief = event("Debrief")
+
+local INK = Color3.fromRGB(20, 17, 14)
+local PAPER = Color3.fromRGB(244, 239, 230)
+local AMBER = Color3.fromRGB(224, 160, 69)
+local PANEL = Color3.fromRGB(34, 28, 22)
+
+local gui = Instance.new("ScreenGui")
+gui.Name = "CODAG"
+gui.ResetOnSpawn = false
+gui.Parent = player:WaitForChild("PlayerGui")
+
+local function corner(parent: Instance, radius: number)
+	local ui = Instance.new("UICorner")
+	ui.CornerRadius = UDim.new(0, radius)
+	ui.Parent = parent
+end
+
+local function label(parent: Instance, text: string, size: number, color: Color3): TextLabel
+	local item = Instance.new("TextLabel")
+	item.BackgroundTransparency = 1
+	item.Font = Enum.Font.Gotham
+	item.TextSize = size
+	item.TextColor3 = color
+	item.TextXAlignment = Enum.TextXAlignment.Left
+	item.TextWrapped = true
+	item.Text = text
+	item.Size = UDim2.new(1, 0, 0, 0)
+	item.AutomaticSize = Enum.AutomaticSize.Y
+	item.Parent = parent
+	return item
+end
+
+local function button(parent: Instance, text: string, primary: boolean): TextButton
+	local item = Instance.new("TextButton")
+	item.Size = UDim2.new(1, 0, 0, 44)
+	item.BackgroundColor3 = if primary then AMBER else PANEL
+	item.TextColor3 = if primary then INK else PAPER
+	item.Font = Enum.Font.GothamBold
+	item.TextSize = 16
+	item.Text = text
+	item.AutoButtonColor = true
+	item.Parent = parent
+	corner(item, 10)
+	return item
+end
+
+local function page(name: string): ScrollingFrame
+	local frame = Instance.new("ScrollingFrame")
+	frame.Name = name
+	frame.Visible = false
+	frame.Size = UDim2.fromOffset(420, 560)
+	frame.Position = UDim2.new(0, 16, 0, 16)
+	frame.BackgroundColor3 = INK
+	frame.BorderSizePixel = 0
+	frame.ScrollBarThickness = 6
+	frame.AutomaticCanvasSize = Enum.AutomaticSize.Y
+	frame.CanvasSize = UDim2.new()
+	frame.Parent = gui
+	corner(frame, 16)
+	local layout = Instance.new("UIListLayout")
+	layout.Padding = UDim.new(0, 8)
+	layout.SortOrder = Enum.SortOrder.LayoutOrder
+	layout.Parent = frame
+	local pad = Instance.new("UIPadding")
+	pad.PaddingTop = UDim.new(0, 14)
+	pad.PaddingBottom = UDim.new(0, 14)
+	pad.PaddingLeft = UDim.new(0, 14)
+	pad.PaddingRight = UDim.new(0, 14)
+	pad.Parent = frame
+	return frame
+end
+
+local note = Instance.new("Frame")
+note.Name = "Note"
+note.Size = UDim2.fromOffset(360, 120)
+note.Position = UDim2.new(0, 16, 0, 16)
+note.BackgroundColor3 = INK
+note.Parent = gui
+corner(note, 16)
+local noteLayout = Instance.new("UIListLayout")
+noteLayout.Padding = UDim.new(0, 6)
+noteLayout.Parent = note
+local notePad = Instance.new("UIPadding")
+notePad.PaddingTop = UDim.new(0, 12)
+notePad.PaddingLeft = UDim.new(0, 12)
+notePad.PaddingRight = UDim.new(0, 12)
+notePad.Parent = note
+label(note, "CODAG.0", 14, AMBER)
+label(note, "Pick up a colored pile. Then drag it onto Shell, Wrap, or Air.", 16, PAPER)
+local openBuild = button(note, "Build the suit", true)
+
+local workshop = page("Workshop")
+local planets = page("Planets")
+local difficulty = page("Difficulty")
+local debrief = page("Debrief")
+
+local hud = Instance.new("Frame")
+hud.Name = "Hud"
+hud.Visible = false
+hud.Size = UDim2.fromOffset(320, 220)
+hud.Position = UDim2.new(0, 16, 0, 16)
+hud.BackgroundColor3 = INK
+hud.Parent = gui
+corner(hud, 16)
+local hudLayout = Instance.new("UIListLayout")
+hudLayout.Padding = UDim.new(0, 6)
+hudLayout.Parent = hud
+local hudPad = Instance.new("UIPadding")
+hudPad.PaddingTop = UDim.new(0, 12)
+hudPad.PaddingLeft = UDim.new(0, 12)
+hudPad.PaddingRight = UDim.new(0, 12)
+hudPad.Parent = hud
+
+local function clear(frame: Instance)
+	for _, child in frame:GetChildren() do
+		if not child:IsA("UIListLayout") and not child:IsA("UIPadding") then
+			child:Destroy()
+		end
+	end
+end
+
+local function show(which: ScrollingFrame?)
+	workshop.Visible = which == workshop
+	planets.Visible = which == planets
+	difficulty.Visible = which == difficulty
+	debrief.Visible = which == debrief
+	note.Visible = which == nil and hud.Visible == false
+end
+
+local state = nil
+local chosenPlanet = nil
+local picked = nil
+
+local function designFrom(public)
+	return {
+		shellMaterialId = if public.shellMaterialId ~= "" then public.shellMaterialId else nil,
+		shellRadiusM = public.shellRadiusM,
+		shellThicknessM = public.shellThicknessM,
+		insulationMaterialId = if public.insulationMaterialId ~= "" then public.insulationMaterialId else nil,
+		insulationThicknessM = public.insulationThicknessM,
+		oxygenKg = public.oxygenKg,
+	}
+end
+
+local function materialName(id: string): string
+	if id == nil or id == "" then
+		return "Empty"
+	end
+	return Catalog.materialById(id).name
+end
+
+local function renderWorkshop()
+	clear(workshop)
+	label(workshop, "CODAG.0", 14, AMBER)
+	label(workshop, "Drag what you found onto the suit.", 28, PAPER).Font = Enum.Font.GothamBold
+	label(workshop, "Shell holds your air in. Wrap slows the heat. Air is the bottles. You never type a size.", 16, Color3.fromRGB(217, 203, 182))
+	label(workshop, state.hint, 16, AMBER)
+	if state.problem ~= "" then
+		label(workshop, state.problem, 16, Color3.fromRGB(224, 122, 74))
+	end
+	for _, material in Catalog.MATERIALS do
+		if (state.inventory[material.id] or 0) > 0 then
+			local card = button(workshop, material.name, picked == material.id)
+			card.MouseButton1Click:Connect(function()
+				picked = material.id
+				renderWorkshop()
+			end)
+		end
+	end
+	local design = designFrom(state.design)
+	local slots = {
+		{ id = "shell", title = "Shell", filled = materialName(design.shellMaterialId) },
+		{ id = "wrap", title = "Wrap", filled = materialName(design.insulationMaterialId) },
+		{ id = "air", title = "Air", filled = if design.oxygenKg > 0 then "Bottles packed" else "Empty" },
+	}
+	for _, slot in slots do
+		local slotButton = button(workshop, slot.title .. "  ·  " .. slot.filled, false)
+		slotButton.MouseButton1Click:Connect(function()
+			if picked ~= nil then
+				Place:FireServer(picked, slot.id)
+				picked = nil
+			end
+		end)
+		if slot.filled ~= "Empty" then
+			local off = button(workshop, "Take off " .. slot.title, false)
+			off.MouseButton1Click:Connect(function()
+				ClearSlot:FireServer(slot.id)
+			end)
+		end
+	end
+	for _, size in { { "fits", "Fits me" }, { "bigger", "A bit bigger" }, { "bulky", "Big and heavy" } } do
+		local sizeButton = button(workshop, size[2], false)
+		sizeButton.MouseButton1Click:Connect(function()
+			SetSize:FireServer(size[1])
+		end)
+	end
+	local check = Catalog.difficultyById("normal").minSafetyFactor
+	local moon = Catalog.planetById("moon")
+	label(workshop, "Same suit, Moon:", 16, PAPER)
+	label(workshop, Survival.kidResult(design, moon, check, "hot"), 16, PAPER)
+	label(workshop, Survival.kidResult(design, moon, check, "cold"), 16, PAPER)
+	local go = button(workshop, "Try this suit on a planet", true)
+	go.Active = state.problem == ""
+	go.AutoButtonColor = state.problem == ""
+	go.MouseButton1Click:Connect(function()
+		if state.problem == "" then
+			show(planets)
+			renderPlanets()
+		end
+	end)
+end
+
+openBuild.MouseButton1Click:Connect(function()
+	show(workshop)
+	if state ~= nil then
+		renderWorkshop()
+	end
+end)
+
+local function isOpen(planetId: string): boolean
+	local previous = nil
+	local cleared = {}
+	for _, id in state.clears do
+		cleared[id] = true
+	end
+	for _, id in Sources.DESTINATION_ORDER do
+		if id == planetId then
+			return previous == nil or cleared[previous] == true
+		end
+		previous = id
+	end
+	return false
+end
+
+function renderPlanets()
+	clear(planets)
+	label(planets, "Same suit. Different planet.", 28, PAPER).Font = Enum.Font.GothamBold
+	label(planets, "The line under each name is what this suit would do there. The planet numbers do not change.", 16, Color3.fromRGB(217, 203, 182))
+	local design = designFrom(state.design)
+	local check = Catalog.difficultyById("normal").minSafetyFactor
+	for _, planetId in Sources.DESTINATION_ORDER do
+		local planet = Catalog.planetById(planetId)
+		local open = isOpen(planetId)
+		label(planets, planet.name, 20, PAPER).Font = Enum.Font.GothamBold
+		label(planets, Survival.kidResult(design, planet, check, "hot"), 16, PAPER)
+		local choose = button(planets, if open then "Select" else "Locked", open)
+		choose.Active = open
+		choose.MouseButton1Click:Connect(function()
+			if open then
+				chosenPlanet = planetId
+				show(difficulty)
+				renderDifficulty()
+			end
+		end)
+	end
+	local back = button(planets, "Back to the suit", false)
+	back.MouseButton1Click:Connect(function()
+		show(workshop)
+	end)
+end
+
+function renderDifficulty()
+	clear(difficulty)
+	local planet = Catalog.planetById(chosenPlanet)
+	label(difficulty, planet.name, 28, PAPER).Font = Enum.Font.GothamBold
+	label(difficulty, planet.referencePressure.transcribedFrom, 16, Color3.fromRGB(217, 203, 182))
+	label(difficulty, "Difficulty changes the rules, not the planet.", 16, PAPER)
+	for _, profile in Catalog.DIFFICULTIES do
+		local pick = button(difficulty, profile.label, profile.id == "normal")
+		pick.MouseButton1Click:Connect(function()
+			clear(difficulty)
+			label(difficulty, planet.name .. " · " .. profile.label, 28, PAPER).Font = Enum.Font.GothamBold
+			local hot = Survival.exposure(planet, "hot")
+			local cold = Survival.exposure(planet, "cold")
+			local hotButton = button(difficulty, string.format("Hot side, %.0f °C", Survival.celsius(hot.kelvin)), true)
+			local coldButton = button(difficulty, string.format("Cold side, %.0f °C", Survival.celsius(cold.kelvin)), true)
+			hotButton.MouseButton1Click:Connect(function()
+				Depart:FireServer(planet.id, profile.id, "hot")
+				show(nil)
+			end)
+			coldButton.MouseButton1Click:Connect(function()
+				Depart:FireServer(planet.id, profile.id, "cold")
+				show(nil)
+			end)
+			label(difficulty, hot.transcribedFrom, 14, Color3.fromRGB(217, 203, 182))
+		end)
+	end
+	local back = button(difficulty, "Back", false)
+	back.MouseButton1Click:Connect(function()
+		show(planets)
+		renderPlanets()
+	end)
+end
+
+local hudTitle = label(hud, "CODAG.0", 14, AMBER)
+local hudClock = label(hud, "0:00 / 20:00", 28, PAPER)
+hudClock.Font = Enum.Font.GothamBold
+local hudAir = label(hud, "Air held in", 16, PAPER)
+local hudCore = label(hud, "Core 37 °C", 16, PAPER)
+local hudOxygen = label(hud, "Oxygen", 16, PAPER)
+local hudDeath = label(hud, "", 18, Color3.fromRGB(224, 122, 74))
+local died = button(hud, "You died", true)
+died.Visible = false
+died.MouseButton1Click:Connect(function()
+	hud.Visible = false
+	debrief.Visible = true
+end)
+
+local function clock(seconds: number): string
+	local whole = math.max(0, math.floor(seconds))
+	return string.format("%d:%02d", math.floor(whole / 60), whole % 60)
+end
+
+local function renderHud()
+	local inMission = player:GetAttribute("InMission") == true
+	hud.Visible = inMission
+	if inMission then
+		note.Visible = false
+	end
+	if not inMission then
+		return
+	end
+	show(nil)
+	local planetName = player:GetAttribute("MissionPlanet") or ""
+	local side = player:GetAttribute("MissionSide") or ""
+	local mode = player:GetAttribute("MissionDifficulty") or ""
+	hudTitle.Text = string.upper(planetName) .. " · " .. string.upper(side) .. " · " .. string.upper(mode)
+	hudClock.Text = clock(player:GetAttribute("MissionClock") or 0) .. " / 20:00"
+	local held = player:GetAttribute("AirHeld") or 100
+	hudAir.Text = if held >= 100 then "Air held in. The shell is closed." else string.format("Air held in  %.0f%%. No shell. The air is leaving.", held)
+	hudCore.Text = string.format("Core  %.1f °C", player:GetAttribute("CoreC") or 37)
+	hudOxygen.Text = string.format("Oxygen  %.3f kg", player:GetAttribute("OxygenKg") or 0)
+	local alive = player:GetAttribute("Alive") ~= false
+	local cause = player:GetAttribute("CauseTitle") or ""
+	hudDeath.Text = if alive then "" else cause
+	died.Visible = not alive
+	died.Text = if alive then "You held on" else "You died"
+end
+
+player:GetAttributeChangedSignal("MissionClock"):Connect(renderHud)
+player:GetAttributeChangedSignal("InMission"):Connect(renderHud)
+player:GetAttributeChangedSignal("Alive"):Connect(renderHud)
+player:GetAttributeChangedSignal("CoreC"):Connect(renderHud)
+player:GetAttributeChangedSignal("AirHeld"):Connect(renderHud)
+
+State.OnClientEvent:Connect(function(nextState)
+	state = nextState
+	if debrief.Visible or hud.Visible or planets.Visible or difficulty.Visible then
+		return
+	end
+	if workshop.Visible then
+		renderWorkshop()
+	end
+end)
+
+Debrief.OnClientEvent:Connect(function(report)
+	clear(debrief)
+	hud.Visible = false
+	show(debrief)
+	label(debrief, if report.survived then "You survived" else "You died", 14, AMBER)
+	label(debrief, report.title, 28, PAPER).Font = Enum.Font.GothamBold
+	label(debrief, report.detail, 16, PAPER)
+	label(debrief, "Looked up for this result", 20, PAPER).Font = Enum.Font.GothamBold
+	label(debrief, "These lines were retrieved from the fact sheets. The physics check decided pass or fail. No model filled in a number.", 14, Color3.fromRGB(217, 203, 182))
+	for _, fact in report.facts do
+		label(debrief, fact.text, 15, PAPER)
+		label(debrief, fact.body .. " fact sheet", 13, AMBER)
+		label(debrief, fact.sourceUrl, 12, Color3.fromRGB(240, 194, 122))
+	end
+	local again = button(debrief, "Try again", false)
+	again.MouseButton1Click:Connect(function()
+		show(difficulty)
+		renderDifficulty()
+	end)
+	local suit = button(debrief, "Change the suit", false)
+	suit.MouseButton1Click:Connect(function()
+		show(workshop)
+		renderWorkshop()
+	end)
+	local earth = button(debrief, "Back to Earth", true)
+	earth.MouseButton1Click:Connect(function()
+		Abort:FireServer()
+		show(workshop)
+		renderWorkshop()
+	end)
+end)
+
+show(nil)
+event("Ready"):FireServer()
+]]></string>
+        </Properties>
+      </Item>
+    </Item>
+  </Item>
+  <Item class="Workspace" referent="21">
+    <Properties>
+      <string name="Name">Workspace</string>
+      <float name="Gravity">196.2</float>
+      <bool name="NeedsPivotMigration">false</bool>
+    </Properties>
+  </Item>
+</roblox>

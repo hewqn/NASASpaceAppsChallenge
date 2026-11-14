@@ -1,29 +1,36 @@
 import { CuboidCollider, Physics, RigidBody } from '@react-three/rapier'
+import { Atmosphere } from './Atmosphere'
+import { Terrain } from './Terrain'
 import { Walker } from './Walker'
 
 export function SurvivalWorld({
   gravityMs2,
   ground,
   sky,
+  airless = false,
+  seed = 7,
+  shellColor = null,
+  wrapColor = null,
+  hasAir = false,
 }: {
   gravityMs2: number
   ground: string
   sky: string
+  /** True where there is no atmosphere to scatter light: stars show and shadows go hard. */
+  airless?: boolean
+  seed?: number
+  shellColor?: string | null
+  wrapColor?: string | null
+  hasAir?: boolean
 }) {
   return (
     <Physics gravity={[0, -gravityMs2, 0]}>
-      <color attach="background" args={[sky]} />
-      <fog attach="fog" args={[sky, 12, 36]} />
-      <hemisphereLight args={['#f0e2c8', ground, 0.65]} />
-      <directionalLight position={[8, 16, 6]} intensity={1.4} castShadow />
+      <Atmosphere sky={sky} ground={ground} airless={airless} />
       <RigidBody type="fixed" colliders={false} position={[0, -0.5, 0]}>
         <CuboidCollider args={[40, 0.5, 40]} />
-        <mesh receiveShadow>
-          <boxGeometry args={[80, 1, 80]} />
-          <meshStandardMaterial color={ground} roughness={0.92} />
-        </mesh>
       </RigidBody>
-      <Walker color="#e7d3a1" />
+      <Terrain base={ground} seed={seed} rocks={80} />
+      <Walker color="#e7d3a1" shellColor={shellColor} wrapColor={wrapColor} hasAir={hasAir} />
     </Physics>
   )
 }
