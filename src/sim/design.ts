@@ -15,10 +15,10 @@ export const TANK_KG_PER_OXYGEN_KG = 5
 export function emptyDesign(): Design {
   return {
     shellMaterialId: null,
-    shellRadiusM: 0.55,
-    shellThicknessM: 0.004,
+    shellRadiusM: 0.48,
+    shellThicknessM: 0.0016,
     insulationMaterialId: null,
-    insulationThicknessM: 0.02,
+    insulationThicknessM: 0.012,
     oxygenKg: 0,
   }
 }
@@ -65,19 +65,19 @@ export function stockProblem(design: Design, inventory: Inventory): string | nul
     const have = inventory[design.shellMaterialId] ?? 0
     const need = shellMassKg(design)
     if (need > have + 1e-6) {
-      return `The shell needs ${need.toFixed(1)} kg of ${materialById(design.shellMaterialId).name}. You have found ${have.toFixed(1)} kg.`
+      return `That shell is heavier than the ${materialById(design.shellMaterialId).name.toLowerCase()} you found. Try a smaller suit.`
     }
   }
   if (design.insulationMaterialId) {
     const have = inventory[design.insulationMaterialId] ?? 0
     const need = insulationMassKg(design)
     if (need > have + 1e-6) {
-      return `The wrap needs ${need.toFixed(1)} kg of ${materialById(design.insulationMaterialId).name}. You have found ${have.toFixed(1)} kg.`
+      return `That wrap is heavier than the ${materialById(design.insulationMaterialId).name.toLowerCase()} you found. Try a smaller suit.`
     }
   }
   const oxygen = inventory.oxygen ?? 0
   if (design.oxygenKg > oxygen + 1e-6) {
-    return `You packed ${design.oxygenKg.toFixed(1)} kg of oxygen and only found ${oxygen.toFixed(1)} kg.`
+    return 'You packed more oxygen than you found.'
   }
   return null
 }

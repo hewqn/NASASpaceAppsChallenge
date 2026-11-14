@@ -28,9 +28,15 @@ export function useHeldKeys() {
 
 export function Walker({
   color,
+  shellColor = null,
+  wrapColor = null,
+  hasAir = false,
   onMove,
 }: {
   color: string
+  shellColor?: string | null
+  wrapColor?: string | null
+  hasAir?: boolean
   onMove?: (x: number, z: number) => void
 }) {
   const body = useRef<RapierRigidBody>(null)
@@ -89,6 +95,24 @@ export function Walker({
           <boxGeometry args={[0.42, 0.55, 0.22]} />
           <meshStandardMaterial color="#b9b2a6" roughness={0.5} metalness={0.3} />
         </mesh>
+        {shellColor ? (
+          <mesh position={[0, -0.08, 0]}>
+            <capsuleGeometry args={[0.42, 0.7, 6, 12]} />
+            <meshStandardMaterial color={shellColor} roughness={0.32} metalness={0.7} transparent opacity={0.38} />
+          </mesh>
+        ) : null}
+        {wrapColor ? (
+          <mesh position={[0, -0.08, 0]}>
+            <capsuleGeometry args={[0.52, 0.78, 6, 12]} />
+            <meshStandardMaterial color={wrapColor} roughness={0.95} transparent opacity={0.45} />
+          </mesh>
+        ) : null}
+        {hasAir ? (
+          <mesh castShadow position={[0.48, -0.25, 0.05]}>
+            <cylinderGeometry args={[0.08, 0.08, 0.34, 10]} />
+            <meshStandardMaterial color="#c4473a" roughness={0.4} metalness={0.2} />
+          </mesh>
+        ) : null}
         <mesh castShadow position={[0.36, -0.08, 0]}>
           <capsuleGeometry args={[0.09, 0.38, 4, 8]} />
           <meshStandardMaterial color={color} roughness={0.6} />

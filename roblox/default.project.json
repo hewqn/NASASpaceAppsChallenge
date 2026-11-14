@@ -1,0 +1,35 @@
+{
+  "name": "CODAG.0",
+  "tree": {
+    "$className": "DataModel",
+    "ReplicatedStorage": {
+      "CODAG": {
+        "$path": "src/shared"
+      }
+    },
+    "ServerScriptService": {
+      "CODAG": {
+        "$path": "src/server"
+      }
+    },
+    "StarterPlayer": {
+      "StarterPlayerScripts": {
+        "CODAG": {
+          "$path": "src/client"
+        }
+      }
+    },
+    "Workspace": {
+      "$properties": {
+        "Gravity": 196.2
+      }
+    },
+    "Lighting": {
+      "$properties": {
+        "ClockTime": 14,
+        "Brightness": 2,
+        "GeographicLatitude": 20
+      }
+    }
+  }
+}

@@ -7,7 +7,8 @@
     "dev": "vite",
     "build": "tsc --noEmit && vite build",
     "preview": "vite preview",
-    "test": "vitest run"
+    "test": "vitest run",
+    "export:roblox": "node scripts/export-roblox-data.mjs"
   },
   "dependencies": {
     "@react-three/drei": "^10.7.9",

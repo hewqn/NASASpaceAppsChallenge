@@ -2,10 +2,12 @@ import { Canvas } from '@react-three/fiber'
 import { Suspense, useEffect, useRef, useState } from 'react'
 import { planetById, difficultyById } from '../data/catalog'
 import type { DifficultyId } from '../types/difficulty'
-import type { Design } from '../sim/design'
+import { materialById } from '../data/materials'
+import { isSealed, type Design } from '../sim/design'
 import { celsius, HUMAN } from '../sim/human'
 import {
   MISSION_SECONDS,
+  VACUUM_FAIL_S,
   initialVitals,
   stepVitals,
   deathTitle,
@@ -99,6 +101,9 @@ export function SurvivalScreen({
   const temp = celsius(display.bodyTempK)
   const tempPct = Math.min(100, Math.max(0, ((temp - 30) / 15) * 100))
   const airPct = Math.min(100, Math.max(0, (display.oxygenKg / oxygenStart) * 100))
+  const heldPct = isSealed(design) ? 100 : Math.max(0, 100 * (1 - display.elapsedS / VACUUM_FAIL_S))
+  const shellColor = design.shellMaterialId ? materialById(design.shellMaterialId).color : null
+  const wrapColor = design.insulationMaterialId ? materialById(design.insulationMaterialId).color : null
 
   return (
     <div className="sim-stage">
@@ -110,6 +115,9 @@ export function SurvivalScreen({
             sky={SKY[planet.id] ?? '#14110e'}
             airless={(planet.referencePressure.value ?? planet.referencePressure.max ?? 0) < 1}
             seed={planet.id.length * 17 + 3}
+            shellColor={shellColor}
+            wrapColor={wrapColor}
+            hasAir={design.oxygenKg > 0}
           />
         </Canvas>
       </Suspense>
@@ -119,6 +127,15 @@ export function SurvivalScreen({
         </p>
         <p className="hud-g">{clock(display.elapsedS)} / {clock(MISSION_SECONDS)}</p>
         <p className="fine">{planet.gravityMs2} m/s² · walk with W A S D · jump with space</p>
+        <label className="meter">
+          Air held in
+          <span className="track">
+            <span className="fill air" style={{ width: `${heldPct}%` }} />
+          </span>
+          <span className="fine">
+            {isSealed(design) ? 'The shell is closed.' : 'No shell. The air is leaving.'}
+          </span>
+        </label>
         <label className="meter">
           Core {temp.toFixed(1)} °C
           <span className="track">

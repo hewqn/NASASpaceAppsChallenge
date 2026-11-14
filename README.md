@@ -1,16 +1,23 @@
 # CODAG.0
 
-A browser mission-design game. This first slice loads NASA fact-sheet numbers into the briefing and into a third-person gravity drop.
+A Roblox mission game. You start on Earth, pick up materials, and drag them onto a suit. Then you try to last twenty minutes on another planet. Gravity in the place is the fact-sheet gravity scaled to the Roblox avatar. Temperature, pressure, oxygen, and crush are checked in SI units.
 
 Portions of this project were written with Cursor AI.
 
-## Run
+## Play in Roblox Studio
+
+Install [Rojo](https://rojo.space/docs/v7/getting-started/installation/) and the Rojo Studio plugin. Then, from this folder:
 
 ```bash
-npm install
-npm test
-npm run dev
+npm run export:roblox
+rojo serve roblox/default.project.json
 ```
+
+In Studio, connect the plugin. Press Play. Walk to a colored pile, pick it up, and drag it onto Shell, Wrap, or Air. The same suit shows a plain result for every planet. The Moon is the first one you can walk on.
+
+The browser experiment in the repo root still runs with `npm install`, `npm test`, and `npm run dev`. The Roblox place is the game.
+
+## NASA data this build uses
 
 ## NASA data this build uses
 
