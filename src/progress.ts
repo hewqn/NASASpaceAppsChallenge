@@ -38,3 +38,14 @@ export function readClears(): MissionClear[] {
 export function clearedPlanetIds(clears: readonly MissionClear[]): Set<string> {
   return new Set(clears.map((entry) => entry.planetId))
 }
+
+export function recordClear(entry: MissionClear): MissionClear[] {
+  const clears = readClears()
+  const already = clears.some(
+    (saved) => saved.planetId === entry.planetId && saved.difficultyId === entry.difficultyId,
+  )
+  if (already) return clears
+  const next = [...clears, entry]
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(next))
+  return next
+}

@@ -1,0 +1,72 @@
+[
+  {
+    "id": "aluminum",
+    "name": "Aluminum sheet",
+    "blurb": "Light metal from the shed. It holds a vacuum, and it melts far below Venus.",
+    "densityKgM3": 2700,
+    "yieldPa": 276000000,
+    "conductivity": 167,
+    "meltingK": 855,
+    "structural": true,
+    "color": "#c5ced6",
+    "foundKg": 25,
+    "position": [2.1, 0.45, 0.4],
+    "sourceNote": "Density is the usual 2700 kg/m³ for aluminum. Yield, conductivity, and melting point are typical 6061 handbook values, not NASA planet data."
+  },
+  {
+    "id": "steel",
+    "name": "Steel scrap",
+    "blurb": "Heavy and strong. It conducts heat so well that a bare steel shell cooks or freezes you.",
+    "densityKgM3": 7850,
+    "yieldPa": 250000000,
+    "conductivity": 50,
+    "meltingK": 1700,
+    "structural": true,
+    "color": "#8d7355",
+    "foundKg": 40,
+    "position": [2.5, 0.5, 1.3],
+    "sourceNote": "Mild-steel handbook values: about 7850 kg/m³, yield near 250 MPa, conductivity near 50 W/m·K."
+  },
+  {
+    "id": "aerogel",
+    "name": "Aerogel blanket",
+    "blurb": "Almost no heat gets through. Too weak to hold pressure by itself.",
+    "densityKgM3": 150,
+    "yieldPa": 100000,
+    "conductivity": 0.015,
+    "meltingK": 1400,
+    "structural": false,
+    "color": "#d5e4ea",
+    "foundKg": 8,
+    "position": [0.2, 0.4, -2.8],
+    "sourceNote": "Silica aerogel blanket: low density and conductivity around 0.015 W/m·K. It is insulation, not a pressure shell."
+  },
+  {
+    "id": "wool",
+    "name": "Wool batting",
+    "blurb": "Enough for a short cold stay. It chars long before Venus.",
+    "densityKgM3": 300,
+    "yieldPa": 0,
+    "conductivity": 0.04,
+    "meltingK": 450,
+    "structural": false,
+    "color": "#c4a574",
+    "foundKg": 6,
+    "position": [-1.4, 0.4, -2.6],
+    "sourceNote": "Wool batting is a poor structural material. Conductivity is about 0.04 W/m·K, and it scorches well below 200 °C."
+  },
+  {
+    "id": "oxygen",
+    "name": "Oxygen cylinders",
+    "blurb": "Earth air does not come with you. This is the oxygen you can bottle and carry.",
+    "densityKgM3": 0,
+    "yieldPa": 0,
+    "conductivity": 0,
+    "meltingK": 0,
+    "structural": false,
+    "color": "#d45d4a",
+    "foundKg": 2,
+    "position": [1.6, 0.55, -2.4],
+    "sourceNote": "The gas is oxygen. A full cylinder in this yard holds 2 kg, about two days of one person's breathing at the NASA life-support planning rate."
+  }
+]

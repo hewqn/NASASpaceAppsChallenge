@@ -3,24 +3,26 @@ import { difficultyById, DIFFICULTIES, planetById, PLANETS } from '../data/catal
 import { DESTINATION_ORDER, NASA_FACT_SHEET_NOTES } from '../data/sources'
 import type { DifficultyId } from '../types/difficulty'
 import { isDestinationUnlocked } from '../progress'
+import { celsius } from '../sim/human'
+import { deathDetail, deathTitle, exposure, survived, type Side, type Vitals } from '../sim/survival'
 import { Frame } from './Frame'
 
 export function StartScreen({ onStart }: { onStart: () => void }) {
   return (
     <Frame
-      kicker="Single player"
-      title="Design for the planet in front of you."
-      lede="Each destination uses numbers from its NASA fact sheet. Difficulty changes your budget and safety margin. It does not change the planet."
+      kicker="Earth"
+      title="You are built for this planet."
+      lede="The air here is breathable, the pressure is about one bar, and a person can stand in the temperature the Earth fact sheet lists. Leave, and that stops being true. You die if the oxygen runs out, if your core freezes, or if it burns."
       footer={
         <button className="primary" type="button" onClick={onStart}>
-          Begin
+          Step outside
         </button>
       }
     >
       <ol className="steps">
-        <li>Read the briefing. Every stat links to the sheet it came from.</li>
-        <li>Pick Easy, Normal, or Hard.</li>
-        <li>Build gear, check the rocket, then drop in that gravity.</li>
+        <li>Walk the yard and pick up metal, insulation, and oxygen.</li>
+        <li>Build a shell and a wrap from only what you found.</li>
+        <li>Take it to a planet. Last twenty minutes, or die for a reason you can name.</li>
       </ol>
     </Frame>
   )
@@ -29,32 +31,21 @@ export function StartScreen({ onStart }: { onStart: () => void }) {
 export function PlanetSelect({
   clearedIds,
   onBack,
-  onTutorial,
   onDestination,
 }: {
   clearedIds: ReadonlySet<string>
   onBack: () => void
-  onTutorial: () => void
   onDestination: (planetId: string) => void
 }) {
   const earth = planetById('earth')
   return (
     <Frame
-      kicker="Choose a body"
-      title="Earth is the tutorial. The Moon is the first mission."
-      lede="Later planets open after you clear the one before them, on any difficulty."
+      kicker="Leave Earth"
+      title="The Moon is the first place that can kill you."
+      lede="You stay on Earth to build. Each body after the Moon opens when you survive the one before it."
       onBack={onBack}
     >
       <div className="card-list">
-        <article className="choice">
-          <div>
-            <h2>{earth.name}</h2>
-            <p>Tutorial. Gravity {earth.gravityMs2} m/s² from the Earth fact sheet.</p>
-          </div>
-          <button className="primary" type="button" onClick={onTutorial}>
-            Start tutorial
-          </button>
-        </article>
         {DESTINATION_ORDER.map((planetId) => {
           const planet = planetById(planetId)
           const open = isDestinationUnlocked(planetId, clearedIds)
@@ -134,30 +125,39 @@ export function BriefingScreen({
   planetId,
   difficultyId,
   onBack,
-  onContinue,
+  onDepart,
 }: {
   planetId: string
-  difficultyId: DifficultyId | null
+  difficultyId: DifficultyId
   onBack: () => void
-  onContinue: () => void
+  onDepart: (side: Side) => void
 }) {
   const planet = planetById(planetId)
-  const difficulty = difficultyId ? difficultyById(difficultyId) : null
+  const difficulty = difficultyById(difficultyId)
   const rows = briefingRows(planet)
+  const hot = exposure(planet, 'hot')
+  const cold = exposure(planet, 'cold')
   return (
     <Frame
-      kicker={difficulty ? `${planet.name} · ${difficulty.label}` : `${planet.name} tutorial`}
-      title={planet.gravityDatum === '1bar' ? 'There is no ground here.' : 'Read the planet before you build.'}
+      kicker={`${planet.name} · ${difficulty.label}`}
+      title={planet.gravityDatum === '1bar' ? 'There is no ground here.' : 'Your body does not belong here.'}
       lede={
         planet.gravityDatum === '1bar'
-          ? 'NASA gives gravity and temperature at the 1 bar level. The probe starts there. The sheet does not locate a solid surface.'
-          : 'The figures below are copied from this body’s NASA fact sheet. The “why this matters” lines are the game, not extra NASA claims.'
+          ? 'You start at the 1 bar level from the fact sheet. The air is not oxygen, and the temperature is not Earth’s. Hold twenty minutes.'
+          : 'Earth keeps a person near 37 °C in air that contains oxygen. This sheet is what you have to survive for twenty minutes.'
       }
       onBack={onBack}
       footer={
-        <button className="primary" type="button" onClick={onContinue}>
-          Continue to gear
-        </button>
+        <>
+          <button className="primary" type="button" onClick={() => onDepart('hot')}>
+            Hot side, {celsius(hot.kelvin).toFixed(0)} °C
+          </button>
+          {cold.kelvin !== hot.kelvin ? (
+            <button className="ghost" type="button" onClick={() => onDepart('cold')}>
+              Cold side, {celsius(cold.kelvin).toFixed(0)} °C
+            </button>
+          ) : null}
+        </>
       }
     >
       <ul className="stat-list">
@@ -230,45 +230,55 @@ export function PlaceholderScreen({
 export function DebriefScreen({
   planetId,
   difficultyId,
+  side,
+  vitals,
   onAgain,
-  onPlanets,
+  onWorkshop,
+  onEarth,
 }: {
   planetId: string
-  difficultyId: DifficultyId | null
+  difficultyId: DifficultyId
+  side: Side
+  vitals: Vitals
   onAgain: () => void
-  onPlanets: () => void
+  onWorkshop: () => void
+  onEarth: () => void
 }) {
   const planet = planetById(planetId)
-  const difficulty = difficultyId ? difficultyById(difficultyId) : null
+  const madeIt = survived(vitals)
+  const cause = vitals.cause
   return (
     <Frame
-      kicker="Practice drop"
-      title="You felt the gravity. A mission report comes after the gear exists."
-      lede={`This drop used ${planet.gravityMs2} m/s² from the ${planet.name} fact sheet. It does not clear the destination.`}
+      kicker={madeIt ? 'You survived' : 'You died'}
+      title={madeIt ? `Twenty minutes on ${planet.name}.` : deathTitle(cause ?? 'oxygen')}
+      lede={
+        madeIt
+          ? `Your core stayed near 37 °C and you still had oxygen. ${planet.name} is cleared on this difficulty.`
+          : deathDetail(planet, side, cause ?? 'oxygen')
+      }
       footer={
         <>
-          <button className="ghost" type="button" onClick={onAgain}>
-            Drop again
+          <button className="ghost" type="button" onClick={onWorkshop}>
+            Change the suit
           </button>
-          <button className="primary" type="button" onClick={onPlanets}>
-            Back to bodies
+          <button className="ghost" type="button" onClick={onAgain}>
+            Try again
+          </button>
+          <button className="primary" type="button" onClick={onEarth}>
+            Back to Earth
           </button>
         </>
       }
     >
       <p>
         <a href={planet.sourceUrl} target="_blank" rel="noreferrer">
-          {planet.gravityTranscribedFrom}
+          {planet.name} fact sheet
         </a>
       </p>
-      {difficulty ? (
-        <p className="fine">
-          {difficulty.label} is stored with the mission later. Score multiplier ×{difficulty.scoreMultiplier}. Safety
-          factor required: {difficulty.minSafetyFactor}.
-        </p>
-      ) : (
-        <p className="fine">The Earth hop is a tutorial, so it has no difficulty multiplier.</p>
-      )}
+      <p className="fine">
+        {difficultyById(difficultyId).label} asks for a safety factor of {difficultyById(difficultyId).minSafetyFactor}.
+        The planet numbers did not change.
+      </p>
     </Frame>
   )
 }
