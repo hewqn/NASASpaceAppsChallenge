@@ -37,9 +37,9 @@ end
 local State = remote("State")
 local Ready = remote("Ready")
 local Debrief = remote("Debrief")
-local Place = remote("Place")
-local ClearSlot = remote("ClearSlot")
-local SetSize = remote("SetSize")
+local AddLayer = remote("AddLayer")
+local RemoveLayer = remote("RemoveLayer")
+local SetOxygen = remote("SetOxygen")
 local Depart = remote("Depart")
 local Abort = remote("Abort")
 
@@ -61,6 +61,41 @@ local function applyLook(planetId: string)
 	Lighting.FogColor = look.sky
 	Lighting.FogStart = if planetId == "earth" then 400 else 40
 	Lighting.FogEnd = if planetId == "earth" then 900 else 180
+
+	local atmoConfig = world.atmo[planetId] or world.atmo.earth
+	local atmoInst = world.atmoInstance
+	if atmoInst then
+		atmoInst.Density = atmoConfig.density
+		atmoInst.Offset = atmoConfig.offset
+		atmoInst.Haze = atmoConfig.haze
+		atmoInst.Glare = atmoConfig.glare
+		atmoInst.Color = atmoConfig.color
+		atmoInst.Decay = atmoConfig.decay
+	end
+
+	local bloom = Lighting:FindFirstChild("CODAGBloom")
+	if bloom then
+		local airless = planetId == "moon" or planetId == "mercury"
+		bloom.Intensity = if airless then 0.6 else 0.4
+		bloom.Threshold = if airless then 0.8 else 0.9
+	end
+
+	local cc = Lighting:FindFirstChild("CODAGColor")
+	if cc then
+		if planetId == "venus" then
+			cc.TintColor = Color3.fromRGB(255, 230, 180)
+			cc.Saturation = 0.15
+		elseif planetId == "mars" then
+			cc.TintColor = Color3.fromRGB(255, 220, 200)
+			cc.Saturation = 0.1
+		elseif planetId == "neptune" or planetId == "uranus" then
+			cc.TintColor = Color3.fromRGB(220, 235, 255)
+			cc.Saturation = 0.05
+		else
+			cc.TintColor = Color3.fromRGB(255, 248, 240)
+			cc.Saturation = 0.08
+		end
+	end
 end
 
 local function gravityFor(planetId: string): number
@@ -78,14 +113,24 @@ local function unlocked(session, planetId: string): boolean
 	return false
 end
 
+-- Send layer-based design to client
 local function publicDesign(design)
+	local layers = {}
+	for _, layer in design.layers do
+		table.insert(layers, {
+			materialId = layer.materialId,
+			thicknessM = layer.thicknessM,
+		})
+	end
+	-- Also send legacy fields for backward compat
 	return {
-		shellMaterialId = design.shellMaterialId or "",
-		shellRadiusM = design.shellRadiusM,
-		shellThicknessM = design.shellThicknessM,
-		insulationMaterialId = design.insulationMaterialId or "",
-		insulationThicknessM = design.insulationThicknessM,
+		layers = layers,
 		oxygenKg = design.oxygenKg,
+		shellMaterialId = Design.shellMaterialId(design) or "",
+		shellRadiusM = Design.outerRadiusM(design),
+		shellThicknessM = Design.shellThicknessM(design),
+		insulationMaterialId = "",
+		insulationThicknessM = 0,
 	}
 end
 
@@ -126,16 +171,20 @@ local function wear(player: Player)
 	local model = Instance.new("Model")
 	model.Name = "CODAGSuit"
 	model.Parent = character
-	local function shellPart(materialId: string?, scale: number, transparency: number)
-		if materialId == nil or materialId == "" then
-			return
-		end
+
+	-- Render each layer as a concentric sphere
+	local radius = Design.BASE_RADIUS_M
+	local baseScale = 4.2 -- studs for base radius
+	for i, layer in session.design.layers do
+		local mat = Catalog.materialById(layer.materialId)
+		radius += layer.thicknessM
+		local scale = radius / Design.BASE_RADIUS_M
 		local piece = Instance.new("Part")
-		piece.Name = materialId
+		piece.Name = mat.id .. "_" .. tostring(i)
 		piece.Shape = Enum.PartType.Ball
-		piece.Size = Vector3.new(4.2, 5.4, 4.2) * scale
-		piece.Color = world.hexColor(Catalog.materialById(materialId).color)
-		piece.Transparency = transparency
+		piece.Size = Vector3.new(baseScale, 5.4, baseScale) * scale
+		piece.Color = world.hexColor(mat.color)
+		piece.Transparency = 0.3 + (i * 0.08)
 		piece.CanCollide = false
 		piece.Massless = true
 		piece.CFrame = root.CFrame
@@ -145,8 +194,8 @@ local function wear(player: Player)
 		weld.Part1 = piece
 		weld.Parent = piece
 	end
-	shellPart(session.design.shellMaterialId, 1, 0.55)
-	shellPart(session.design.insulationMaterialId, 1.18, 0.45)
+
+	-- Oxygen tank
 	if session.design.oxygenKg > 0 then
 		local bottle = Instance.new("Part")
 		bottle.Name = "Oxygen"
@@ -219,7 +268,7 @@ local function finishMission(player: Player)
 		survived = madeIt,
 		title = if madeIt then "Twenty minutes on " .. planet.name .. "." else Survival.deathTitle(cause),
 		detail = if madeIt
-			then "Your core stayed near 37 °C and you still had oxygen."
+			then "Your core stayed near 37 C and you still had oxygen."
 			else Survival.deathDetail(planet, mission.side, cause),
 		facts = lines,
 	})
@@ -299,47 +348,6 @@ local function depart(player: Player, planetId: string, difficultyId: string, si
 	stepMission(player, 0)
 end
 
-local function place(player: Player, materialId: string, slot: string)
-	local session = sessions[player]
-	if session == nil then
-		return
-	end
-	if (session.inventory[materialId] or 0) <= 0 then
-		session.hint = "You have not found that yet."
-		sendState(player)
-		return
-	end
-	local material = Catalog.materialById(materialId)
-	local design = session.design
-	if slot == "air" then
-		if materialId ~= "oxygen" then
-			session.hint = "Only the red bottles go on Air."
-		else
-			design.oxygenKg = session.inventory.oxygen or 0
-			session.hint = "Bottles packed. That is all the air you found."
-		end
-	elseif slot == "shell" then
-		if materialId == "oxygen" then
-			session.hint = "Bottles go on Air."
-		elseif not material.structural then
-			session.hint = material.name .. " cannot hold air. Put it on the wrap."
-		else
-			design.shellMaterialId = materialId
-			session.hint = material.name .. " is the hard shell. It keeps your air in."
-		end
-	elseif slot == "wrap" then
-		if materialId == "oxygen" or material.structural then
-			session.hint = if materialId == "oxygen" then "Bottles go on Air." else material.name .. " is hard. It belongs on the shell."
-		else
-			design.insulationMaterialId = materialId
-			session.hint = material.name .. " is the wrap. It slows the heat."
-		end
-	end
-	session.problem = Design.stockProblem(design, session.inventory)
-	wear(player)
-	sendState(player)
-end
-
 local function collect(player: Player, materialId: string)
 	local session = sessions[player]
 	local cache = world.caches[materialId]
@@ -353,40 +361,7 @@ local function collect(player: Player, materialId: string)
 	session.inventory[materialId] = material.foundKg
 	cache.prompt.Enabled = false
 	cache.part.Transparency = 0.75
-	local token = cache.part:Clone()
-	token.Transparency = 0
-	token.Size = Vector3.new(3, 2, 3)
-	token.CFrame = world.pads.shell.CFrame * CFrame.new(0, 3, 6)
-	token.Anchored = true
-	token:SetAttribute("MaterialId", materialId)
-	local oldPrompt = token:FindFirstChildOfClass("ProximityPrompt")
-	if oldPrompt then
-		oldPrompt:Destroy()
-	end
-	token.Parent = world.bench
-	local homeCFrame = token.CFrame
-	local created, drag = pcall(function()
-		return Instance.new("DragDetector")
-	end)
-	if created and drag ~= nil then
-		drag.Parent = token
-		drag.DragEnd:Connect(function(who: Player)
-			local nearest = nil
-			local best = 12
-			for _, pad in pairs(world.pads) do
-				local distance = (pad.Position - token.Position).Magnitude
-				if distance < best then
-					nearest = pad
-					best = distance
-				end
-			end
-			token.CFrame = homeCFrame
-			if nearest ~= nil and typeof(who) == "Instance" then
-				place(who, materialId, nearest:GetAttribute("Slot"))
-			end
-		end)
-	end
-	session.hint = "Picked up " .. material.name .. ". Drag it onto Shell, Wrap, or Air."
+	session.hint = "Picked up " .. material.name .. "."
 	sendState(player)
 end
 
@@ -395,7 +370,7 @@ local function startSession(player: Player)
 		inventory = emptyInventory(),
 		design = Design.emptyDesign(),
 		clears = {},
-		hint = "Pick up a pile, then drag it onto a pad.",
+		hint = "Collect materials, then build your suit layer by layer.",
 		problem = nil,
 		mission = nil,
 	}
@@ -409,42 +384,77 @@ for _, cache in world.caches do
 	end)
 end
 
-Place.OnServerEvent:Connect(function(player, materialId, slot)
-	if typeof(materialId) ~= "string" or typeof(slot) ~= "string" then
-		return
-	end
-	place(player, materialId, slot)
-end)
-
-ClearSlot.OnServerEvent:Connect(function(player, slot)
+-- Add a layer to the suit
+AddLayer.OnServerEvent:Connect(function(player, materialId, thicknessId)
 	local session = sessions[player]
-	if session == nil or typeof(slot) ~= "string" then
+	if session == nil or typeof(materialId) ~= "string" or typeof(thicknessId) ~= "string" then
 		return
 	end
-	if slot == "shell" then
-		session.design.shellMaterialId = nil
-	elseif slot == "wrap" then
-		session.design.insulationMaterialId = nil
-	elseif slot == "air" then
-		session.design.oxygenKg = 0
+	if materialId == "oxygen" then
+		session.hint = "Use the oxygen control to add air tanks."
+		sendState(player)
+		return
 	end
+	if (session.inventory[materialId] or 0) <= 0 then
+		session.hint = "You have not found that yet."
+		sendState(player)
+		return
+	end
+	-- Find thickness
+	local thickness = nil
+	for _, opt in Design.THICKNESS_OPTIONS do
+		if opt.id == thicknessId then
+			thickness = opt.meters
+			break
+		end
+	end
+	if thickness == nil then
+		return
+	end
+	-- Max 8 layers
+	if #session.design.layers >= 8 then
+		session.hint = "Maximum 8 layers. Remove one first."
+		sendState(player)
+		return
+	end
+	table.insert(session.design.layers, {
+		materialId = materialId,
+		thicknessM = thickness,
+	})
+	local mat = Catalog.materialById(materialId)
+	session.hint = "Added " .. mat.name .. " layer."
 	session.problem = Design.stockProblem(session.design, session.inventory)
-	session.hint = "Took it off."
 	wear(player)
 	sendState(player)
 end)
 
-SetSize.OnServerEvent:Connect(function(player, sizeId)
+-- Remove a layer by index
+RemoveLayer.OnServerEvent:Connect(function(player, layerIndex)
 	local session = sessions[player]
-	local size = Design.SIZES[sizeId]
-	if session == nil or size == nil then
+	if session == nil or typeof(layerIndex) ~= "number" then
 		return
 	end
-	session.design.shellRadiusM = size.shellRadiusM
-	session.design.shellThicknessM = size.shellThicknessM
-	session.design.insulationThicknessM = size.insulationThicknessM
+	layerIndex = math.floor(layerIndex)
+	if layerIndex < 1 or layerIndex > #session.design.layers then
+		return
+	end
+	table.remove(session.design.layers, layerIndex)
+	session.hint = "Removed layer."
 	session.problem = Design.stockProblem(session.design, session.inventory)
-	session.hint = "Suit size changed. The weight is calculated from that."
+	wear(player)
+	sendState(player)
+end)
+
+-- Set oxygen amount
+SetOxygen.OnServerEvent:Connect(function(player, kg)
+	local session = sessions[player]
+	if session == nil or typeof(kg) ~= "number" then
+		return
+	end
+	local available = session.inventory.oxygen or 0
+	session.design.oxygenKg = math.clamp(kg, 0, available)
+	session.hint = string.format("Packed %.1f kg of oxygen.", session.design.oxygenKg)
+	session.problem = Design.stockProblem(session.design, session.inventory)
 	sendState(player)
 end)
 
