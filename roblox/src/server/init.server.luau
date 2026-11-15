@@ -28,6 +28,11 @@ local function remote(name: string): RemoteEvent
 		folder.Name = "Remotes"
 		folder.Parent = shared
 	end
+	-- Reuse existing event so client references survive server restart (Rojo sync)
+	local existing = folder:FindFirstChild(name)
+	if existing and existing:IsA("RemoteEvent") then
+		return existing
+	end
 	local event = Instance.new("RemoteEvent")
 	event.Name = name
 	event.Parent = folder
