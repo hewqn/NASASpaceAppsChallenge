@@ -260,9 +260,13 @@ end
 
 local current = nil
 local function show(target)
+	warn("[CODAG Client] show() called, current =", current and current.Name or "nil", "target =", target and target.Name or "nil")
 	if current then current.Visible = false end
 	if target then target.Visible = true end
 	current = target
+	if target then
+		warn("[CODAG Client] show() target Visible =", target.Visible, "Parent =", target.Parent and target.Parent.Name or "nil", "Size =", tostring(target.Size), "Position =", tostring(target.Position))
+	end
 end
 
 -- ── Intro ───────────────────────────────────────────────────────────────
