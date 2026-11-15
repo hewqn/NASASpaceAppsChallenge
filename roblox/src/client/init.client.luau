@@ -342,6 +342,8 @@ local function designFrom(d)
 	return design
 end
 
+local planets -- forward declaration; assigned after renderWorkshop
+
 function renderWorkshop()
 	clear(workshop)
 
@@ -615,7 +617,7 @@ openBuild.MouseButton1Click:Connect(function()
 end)
 
 -- ── Planets ─────────────────────────────────────────────────────────────
-local planets = page("Planets", true)
+planets = page("Planets", true)
 
 local DEMO_MODE = true
 
