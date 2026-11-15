@@ -260,9 +260,13 @@ end
 
 local current = nil
 local function show(target)
+	warn("[CODAG Client] show() called, current =", current and current.Name or "nil", "target =", target and target.Name or "nil")
 	if current then current.Visible = false end
 	if target then target.Visible = true end
 	current = target
+	if target then
+		warn("[CODAG Client] show() target Visible =", target.Visible, "Parent =", target.Parent and target.Parent.Name or "nil", "Size =", tostring(target.Size), "Position =", tostring(target.Position))
+	end
 end
 
 -- ── Intro ───────────────────────────────────────────────────────────────
@@ -337,6 +341,8 @@ local function designFrom(d)
 	end
 	return design
 end
+
+local planets -- forward declaration; assigned after renderWorkshop
 
 function renderWorkshop()
 	clear(workshop)
@@ -611,8 +617,9 @@ openBuild.MouseButton1Click:Connect(function()
 end)
 
 -- ── Planets ─────────────────────────────────────────────────────────────
-local planets = page("Planets", true)
+planets = page("Planets", true)
 
+local difficulty -- forward declaration; assigned after renderPlanets
 local DEMO_MODE = true
 
 local function isOpen(planetId: string): boolean
@@ -732,7 +739,7 @@ function renderPlanets()
 end
 
 -- ── Difficulty / Briefing ───────────────────────────────────────────────
-local difficulty = page("Difficulty", true)
+difficulty = page("Difficulty", true)
 
 function renderDifficulty()
 	clear(difficulty)
