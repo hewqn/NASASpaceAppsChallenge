@@ -657,6 +657,31 @@ local function build()
 			pad.CastShadow = false
 			planetPads[planet.id] = pad
 
+			-- Scaled sun disc (NASA-accurate apparent size)
+			-- Sun angular diameter from Earth ≈ 0.53°
+			-- From other planets: 0.53 / semimajorAxisAu
+			-- We represent this as a neon ball high in the sky, scaled proportionally
+			local earthAu = 1.0
+			local sunScale = earthAu / (planet.semimajorAxisAu or 1)
+			local sunSize = math.clamp(sunScale * 20, 1, 55) -- 20 studs = Earth baseline
+			local sunDisc = Instance.new("Part")
+			sunDisc.Name = "SunDisc"
+			sunDisc.Shape = Enum.PartType.Ball
+			sunDisc.Size = Vector3.new(sunSize, sunSize, sunSize)
+			sunDisc.CFrame = CFrame.new(cx + 300, 500, cz - 400)
+			sunDisc.Color = Color3.fromRGB(255, 250, 220)
+			sunDisc.Material = Enum.Material.Neon
+			sunDisc.Transparency = 0
+			sunDisc.Anchored = true
+			sunDisc.CanCollide = false
+			sunDisc.CastShadow = false
+			sunDisc.Parent = destinations
+			local sunLight = Instance.new("PointLight")
+			sunLight.Color = Color3.fromRGB(255, 245, 220)
+			sunLight.Brightness = math.clamp(sunScale * 2, 0.3, 5)
+			sunLight.Range = 60 + sunSize * 2
+			sunLight.Parent = sunDisc
+
 			-- Particle effects
 			addParticles(destinations, center, PARTICLES[planet.id])
 
