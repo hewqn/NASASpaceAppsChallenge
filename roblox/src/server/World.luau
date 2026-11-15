@@ -1078,13 +1078,9 @@ local function build()
 	part(earth, "DepotWalkGlow", Vector3.new(3.5, 0.06, 0.3),
 		CFrame.new(9, 0.18, habZ), accent, Enum.Material.Neon).Transparency = 0.4
 
-	-- Place materials on shelves (skip any not in Materials.luau)
+	-- Place materials on shelves
 	for _, entry in depotLayout do
-		local matOk, material = pcall(Catalog.materialById, entry.id)
-		if not matOk then
-			warn("[World] Skipping unknown material: " .. entry.id)
-			continue
-		end
+		local material = Catalog.materialById(entry.id)
 		local rc = rackCenters[entry.rack]
 		local shelfY = 0.3 + entry.level * shelfStep + 0.12
 
