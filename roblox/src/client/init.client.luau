@@ -1,145 +1,227 @@
+-- CODAG.0 Client UI
+-- NASA-inspired space aesthetic. Freeform layered suit builder.
+
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local TweenService = game:GetService("TweenService")
 local RunService = game:GetService("RunService")
 
-local shared = ReplicatedStorage:WaitForChild("CODAG")
-local Catalog = require(shared.Data.Catalog)
-local Sources = require(shared.Data.Sources)
-local Survival = require(shared.Sim.Survival)
-local player = Players.LocalPlayer
-local remotes = shared:WaitForChild("Remotes")
+print("[CODAG Client] Script started")
 
-local function event(name: string): RemoteEvent
-	return remotes:WaitForChild(name)
+local shared = ReplicatedStorage:WaitForChild("CODAG", 10)
+if shared == nil then
+	warn("[CODAG Client] CODAG folder not found in ReplicatedStorage after 10s.")
+	return
 end
 
-local Place = event("Place")
-local ClearSlot = event("ClearSlot")
-local SetSize = event("SetSize")
-local Depart = event("Depart")
-local Abort = event("Abort")
-local State = event("State")
+local ok, Catalog = pcall(require, shared.Data.Catalog)
+if not ok then warn("[CODAG Client] Failed to require Catalog:", Catalog); return end
+local ok2, Sources = pcall(require, shared.Data.Sources)
+if not ok2 then warn("[CODAG Client] Failed to require Sources:", Sources); return end
+local ok3, Survival = pcall(require, shared.Sim.Survival)
+if not ok3 then warn("[CODAG Client] Failed to require Survival:", Survival); return end
+local ok4, Design = pcall(require, shared.Sim.Design)
+if not ok4 then warn("[CODAG Client] Failed to require Design:", Design); return end
+
+print("[CODAG Client] Modules loaded")
+
+local player = Players.LocalPlayer
+local remotes = shared:WaitForChild("Remotes", 10)
+if remotes == nil then
+	warn("[CODAG Client] Remotes folder not found after 10s.")
+	return
+end
+
+local function event(name: string): RemoteEvent
+	local e = remotes:WaitForChild(name, 5)
+	if e == nil then
+		warn("[CODAG Client] RemoteEvent '" .. name .. "' not found after 5s")
+	end
+	return e
+end
+
+local Ready = event("Ready")
+local StateEvent = event("State")
 local DebriefEvent = event("Debrief")
+local AddLayer = event("AddLayer")
+local RemoveLayer = event("RemoveLayer")
+local SetOxygen = event("SetOxygen")
+local DepartEvent = event("Depart")
+local AbortEvent = event("Abort")
 
--- ── Design tokens ────────────────────────────────────────────────────────
+-- ── Design Tokens (NASA / Space) ────────────────────────────────────────
+local BG          = Color3.fromRGB(8, 12, 20)
+local BG_PANEL    = Color3.fromRGB(12, 18, 30)
+local BG_CARD     = Color3.fromRGB(18, 26, 42)
+local BG_CARD_HOV = Color3.fromRGB(24, 34, 56)
+local ACCENT      = Color3.fromRGB(60, 145, 255)   -- NASA blue
+local ACCENT_DIM  = Color3.fromRGB(40, 100, 190)
+local DANGER      = Color3.fromRGB(220, 60, 60)
+local SUCCESS     = Color3.fromRGB(40, 200, 120)
+local WARNING     = Color3.fromRGB(240, 180, 40)
+local COOL        = Color3.fromRGB(120, 200, 255)
+local TEXT_WHITE   = Color3.fromRGB(230, 235, 245)
+local TEXT_DIM     = Color3.fromRGB(150, 160, 180)
+local TEXT_FAINT   = Color3.fromRGB(80, 90, 110)
+local BORDER       = Color3.fromRGB(40, 55, 80)
 
-local BG         = Color3.fromRGB(12, 12, 16)
-local BG_PANEL   = Color3.fromRGB(18, 18, 24)
-local BG_CARD    = Color3.fromRGB(26, 26, 34)
-local BG_CARD_HI = Color3.fromRGB(36, 36, 46)
-local TEXT_WHITE  = Color3.fromRGB(230, 230, 235)
-local TEXT_DIM    = Color3.fromRGB(140, 140, 150)
-local TEXT_FAINT  = Color3.fromRGB(90, 90, 100)
-local ACCENT      = Color3.fromRGB(255, 180, 60)   -- warm amber
-local ACCENT_DIM  = Color3.fromRGB(180, 120, 40)
-local DANGER       = Color3.fromRGB(220, 70, 60)
-local SUCCESS      = Color3.fromRGB(70, 200, 110)
-local COOL         = Color3.fromRGB(100, 170, 230)
+local FONT_BODY    = Font.fromEnum(Enum.Font.GothamMedium)
+local FONT_TITLE   = Font.fromEnum(Enum.Font.GothamBold)
+local FONT_DISPLAY = Font.fromEnum(Enum.Font.GothamBlack)
+local FONT_MONO    = Font.fromEnum(Enum.Font.RobotoMono)
 
-local FONT_DISPLAY = Enum.Font.GothamBlack
-local FONT_TITLE   = Enum.Font.GothamBold
-local FONT_BODY    = Enum.Font.Gotham
-local FONT_MONO    = Enum.Font.Code
-
--- ── ScreenGui ────────────────────────────────────────────────────────────
+-- ── State ───────────────────────────────────────────────────────────────
+local state = nil
+local chosenPlanet = nil
+local chosenDifficulty = nil
+local chosenSide = nil
 
 local gui = Instance.new("ScreenGui")
 gui.Name = "CODAG"
 gui.ResetOnSpawn = false
 gui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
-gui.IgnoreGuiInset = true
-gui.Parent = player:WaitForChild("PlayerGui")
+gui.Parent = player.PlayerGui
 
--- ── UI helpers ───────────────────────────────────────────────────────────
-
-local function corner(parent: Instance, radius: number)
-	local ui = Instance.new("UICorner")
-	ui.CornerRadius = UDim.new(0, radius)
-	ui.Parent = parent
+-- ── Helpers ─────────────────────────────────────────────────────────────
+local function corner(parent, radius)
+	local c = Instance.new("UICorner")
+	c.CornerRadius = UDim.new(0, radius or 6)
+	c.Parent = parent
+	return c
 end
 
-local function stroke(parent: Instance, color: Color3, thickness: number, transparency: number?)
-	local ui = Instance.new("UIStroke")
-	ui.Color = color
-	ui.Thickness = thickness
-	ui.Transparency = transparency or 0.7
-	ui.Parent = parent
+local function stroke(parent, color, thick, trans)
+	local s = Instance.new("UIStroke")
+	s.Color = color or BORDER
+	s.Thickness = thick or 1
+	s.Transparency = trans or 0
+	s.Parent = parent
+	return s
 end
 
-local function pad(parent: Instance, top: number, bottom: number, left: number, right: number)
-	local ui = Instance.new("UIPadding")
-	ui.PaddingTop = UDim.new(0, top)
-	ui.PaddingBottom = UDim.new(0, bottom)
-	ui.PaddingLeft = UDim.new(0, left)
-	ui.PaddingRight = UDim.new(0, right)
-	ui.Parent = parent
+local function pad(parent, t, r, b, l)
+	local p = Instance.new("UIPadding")
+	p.PaddingTop = UDim.new(0, t or 12)
+	p.PaddingRight = UDim.new(0, r or 12)
+	p.PaddingBottom = UDim.new(0, b or 12)
+	p.PaddingLeft = UDim.new(0, l or 12)
+	p.Parent = parent
+	return p
 end
 
-local function listLayout(parent: Instance, gap: number, dir: Enum.FillDirection?)
-	local layout = Instance.new("UIListLayout")
-	layout.Padding = UDim.new(0, gap)
-	layout.SortOrder = Enum.SortOrder.LayoutOrder
-	layout.FillDirection = dir or Enum.FillDirection.Vertical
-	layout.Parent = parent
-	return layout
+local function listLayout(parent, gap, dir)
+	local l = Instance.new("UIListLayout")
+	l.Padding = UDim.new(0, gap or 6)
+	l.FillDirection = dir or Enum.FillDirection.Vertical
+	l.SortOrder = Enum.SortOrder.LayoutOrder
+	l.Parent = parent
+	return l
 end
 
-local function label(parent: Instance, text: string, size: number, color: Color3, font: Enum.Font?): TextLabel
-	local item = Instance.new("TextLabel")
-	item.BackgroundTransparency = 1
-	item.Font = font or FONT_BODY
-	item.TextSize = size
-	item.TextColor3 = color
-	item.TextXAlignment = Enum.TextXAlignment.Left
-	item.TextWrapped = true
-	item.Text = text
-	item.Size = UDim2.new(1, 0, 0, 0)
-	item.AutomaticSize = Enum.AutomaticSize.Y
-	item.Parent = parent
-	return item
+local function label(parent, text, size, color, font)
+	local t = Instance.new("TextLabel")
+	t.BackgroundTransparency = 1
+	t.Size = UDim2.new(1, 0, 0, (size or 14) + 6)
+	t.AutomaticSize = Enum.AutomaticSize.Y
+	t.FontFace = font or FONT_BODY
+	t.TextSize = size or 14
+	t.TextColor3 = color or TEXT_DIM
+	t.TextXAlignment = Enum.TextXAlignment.Left
+	t.TextWrapped = true
+	t.Text = text or ""
+	t.Parent = parent
+	return t
 end
 
-local function divider(parent: Instance)
-	local line = Instance.new("Frame")
-	line.BackgroundColor3 = TEXT_FAINT
-	line.BackgroundTransparency = 0.85
-	line.BorderSizePixel = 0
-	line.Size = UDim2.new(1, 0, 0, 1)
-	line.Parent = parent
+local function divider(parent)
+	local d = Instance.new("Frame")
+	d.BackgroundColor3 = BORDER
+	d.BackgroundTransparency = 0.5
+	d.Size = UDim2.new(1, 0, 0, 1)
+	d.BorderSizePixel = 0
+	d.Parent = parent
+	return d
 end
 
-local function btn(parent: Instance, text: string, primary: boolean): TextButton
-	local item = Instance.new("TextButton")
-	item.Size = UDim2.new(1, 0, 0, 50)
-	item.BackgroundColor3 = if primary then ACCENT else BG_CARD
-	item.TextColor3 = if primary then BG else TEXT_WHITE
-	item.Font = FONT_TITLE
-	item.TextSize = 16
-	item.Text = text
-	item.AutoButtonColor = true
-	item.Parent = parent
-	corner(item, 12)
+local function btn(parent, text, primary)
+	local b = Instance.new("TextButton")
+	b.Size = UDim2.new(1, 0, 0, 40)
+	b.AutoButtonColor = false
+	b.FontFace = FONT_TITLE
+	b.TextSize = 13
+	b.TextColor3 = if primary then BG else TEXT_WHITE
+	b.Text = string.upper(text)
+	b.BackgroundColor3 = if primary then ACCENT else BG_CARD
+	b.BorderSizePixel = 0
+	corner(b, 6)
 	if not primary then
-		stroke(item, TEXT_FAINT, 1)
+		stroke(b, BORDER, 1, 0.3)
 	end
-	return item
+	b.Parent = parent
+
+	-- Hover
+	local baseColor = b.BackgroundColor3
+	local hoverColor = if primary then ACCENT_DIM else BG_CARD_HOV
+	b.MouseEnter:Connect(function()
+		TweenService:Create(b, TweenInfo.new(0.15), {BackgroundColor3 = hoverColor}):Play()
+	end)
+	b.MouseLeave:Connect(function()
+		TweenService:Create(b, TweenInfo.new(0.15), {BackgroundColor3 = baseColor}):Play()
+	end)
+	return b
 end
 
-local function card(parent: Instance, highlight: boolean?): Frame
-	local frame = Instance.new("Frame")
-	frame.BackgroundColor3 = if highlight then BG_CARD_HI else BG_CARD
-	frame.BorderSizePixel = 0
-	frame.Size = UDim2.new(1, 0, 0, 0)
-	frame.AutomaticSize = Enum.AutomaticSize.Y
-	frame.Parent = parent
-	corner(frame, 12)
-	pad(frame, 14, 14, 14, 14)
-	listLayout(frame, 6)
-	return frame
+local function card(parent, active)
+	local c = Instance.new("Frame")
+	c.Size = UDim2.new(1, 0, 0, 0)
+	c.AutomaticSize = Enum.AutomaticSize.Y
+	c.BackgroundColor3 = if active then BG_CARD else BG_PANEL
+	c.BackgroundTransparency = if active then 0 else 0.3
+	c.BorderSizePixel = 0
+	corner(c, 8)
+	stroke(c, if active then ACCENT else BORDER, 1, if active then 0.5 else 0.7)
+	pad(c, 12, 12, 12, 12)
+	listLayout(c, 6)
+	c.Parent = parent
+	return c
 end
 
-local function clear(frame: Instance)
+local function meter(parent, labelText, value, max, color)
+	local row = Instance.new("Frame")
+	row.Size = UDim2.new(1, 0, 0, 28)
+	row.BackgroundTransparency = 1
+	row.Parent = parent
+
+	local lbl = Instance.new("TextLabel")
+	lbl.Size = UDim2.new(0.4, 0, 1, 0)
+	lbl.BackgroundTransparency = 1
+	lbl.FontFace = FONT_MONO
+	lbl.TextSize = 11
+	lbl.TextColor3 = TEXT_DIM
+	lbl.TextXAlignment = Enum.TextXAlignment.Left
+	lbl.Text = labelText
+	lbl.Parent = row
+
+	local track = Instance.new("Frame")
+	track.Size = UDim2.new(0.6, 0, 0, 6)
+	track.Position = UDim2.new(0.4, 0, 0.5, -3)
+	track.BackgroundColor3 = BG
+	track.BorderSizePixel = 0
+	corner(track, 3)
+	track.Parent = row
+
+	local fill = Instance.new("Frame")
+	local pct = if max > 0 then math.clamp(value / max, 0, 1) else 0
+	fill.Size = UDim2.new(pct, 0, 1, 0)
+	fill.BackgroundColor3 = color or ACCENT
+	fill.BorderSizePixel = 0
+	corner(fill, 3)
+	fill.Parent = track
+
+	return row, fill
+end
+
+local function clear(frame)
 	for _, child in frame:GetChildren() do
 		if not child:IsA("UIListLayout") and not child:IsA("UIPadding") and not child:IsA("UICorner") and not child:IsA("UIStroke") then
 			child:Destroy()
@@ -147,438 +229,367 @@ local function clear(frame: Instance)
 	end
 end
 
--- ── Meter bar ────────────────────────────────────────────────────────────
-
-local function meter(parent: Instance, labelText: string, pct: number, barColor: Color3): Frame
-	local row = Instance.new("Frame")
-	row.BackgroundTransparency = 1
-	row.Size = UDim2.new(1, 0, 0, 30)
-	row.Parent = parent
-
-	local lbl = Instance.new("TextLabel")
-	lbl.BackgroundTransparency = 1
-	lbl.Font = FONT_MONO
-	lbl.TextSize = 12
-	lbl.TextColor3 = TEXT_DIM
-	lbl.TextXAlignment = Enum.TextXAlignment.Left
-	lbl.Text = labelText
-	lbl.Size = UDim2.new(1, 0, 0, 14)
-	lbl.Parent = row
-
-	local track = Instance.new("Frame")
-	track.BackgroundColor3 = BG_PANEL
-	track.BorderSizePixel = 0
-	track.Size = UDim2.new(1, 0, 0, 6)
-	track.Position = UDim2.new(0, 0, 0, 20)
-	track.Parent = row
-	corner(track, 3)
-
-	local fill = Instance.new("Frame")
-	fill.BackgroundColor3 = barColor
-	fill.BorderSizePixel = 0
-	fill.Size = UDim2.new(math.clamp(pct / 100, 0, 1), 0, 1, 0)
-	fill.Parent = track
-	corner(fill, 3)
-
-	return row
+-- ── Pages ───────────────────────────────────────────────────────────────
+local function page(name)
+	local p = Instance.new("ScrollingFrame")
+	p.Name = name
+	p.Size = UDim2.new(1, 0, 1, 0)
+	p.CanvasSize = UDim2.new(0, 0, 0, 0)
+	p.AutomaticCanvasSize = Enum.AutomaticCanvasSize.Y
+	p.ScrollBarThickness = 3
+	p.ScrollBarImageColor3 = ACCENT
+	p.BackgroundColor3 = BG
+	p.BorderSizePixel = 0
+	p.Visible = false
+	pad(p, 16, 16, 16, 16)
+	listLayout(p, 10)
+	p.Parent = gui
+	return p
 end
 
--- ── Panels ───────────────────────────────────────────────────────────────
-
-local function page(name: string): ScrollingFrame
-	local frame = Instance.new("ScrollingFrame")
-	frame.Name = name
-	frame.Visible = false
-	frame.Size = UDim2.fromOffset(420, 600)
-	frame.Position = UDim2.new(0, 20, 0, 60)
-	frame.BackgroundColor3 = BG_PANEL
-	frame.BackgroundTransparency = 0.02
-	frame.BorderSizePixel = 0
-	frame.ScrollBarThickness = 3
-	frame.ScrollBarImageColor3 = ACCENT_DIM
-	frame.AutomaticCanvasSize = Enum.AutomaticSize.Y
-	frame.CanvasSize = UDim2.new()
-	frame.Parent = gui
-	corner(frame, 16)
-	stroke(frame, ACCENT_DIM, 1, 0.8)
-	listLayout(frame, 10)
-	pad(frame, 20, 20, 20, 20)
-	return frame
+local current = nil
+local function show(target)
+	if current then current.Visible = false end
+	if target then target.Visible = true end
+	current = target
 end
 
--- ── Intro screen ─────────────────────────────────────────────────────────
-
-local introFrame = Instance.new("Frame")
-introFrame.Name = "Intro"
-introFrame.Size = UDim2.fromScale(1, 1)
-introFrame.BackgroundColor3 = BG
-introFrame.BackgroundTransparency = 0
-introFrame.BorderSizePixel = 0
-introFrame.ZIndex = 10
-introFrame.Parent = gui
+-- ── Intro ───────────────────────────────────────────────────────────────
+local intro = page("Intro")
 
 local introContent = Instance.new("Frame")
+introContent.Size = UDim2.new(1, 0, 0, 0)
+introContent.AutomaticSize = Enum.AutomaticSize.Y
 introContent.BackgroundTransparency = 1
-introContent.Size = UDim2.fromOffset(500, 400)
-introContent.Position = UDim2.new(0.5, -250, 0.5, -200)
-introContent.Parent = introFrame
 listLayout(introContent, 16)
+introContent.Parent = intro
 
-local introTitle = label(introContent, "PLANETFALL", 42, ACCENT, FONT_DISPLAY)
+local spacer1 = Instance.new("Frame")
+spacer1.Size = UDim2.new(1, 0, 0, 60)
+spacer1.BackgroundTransparency = 1
+spacer1.Parent = introContent
+
+local introTitle = label(introContent, "CODAG.0", 48, ACCENT, FONT_DISPLAY)
 introTitle.TextXAlignment = Enum.TextXAlignment.Center
-local introSub = label(introContent, "A CODAG.0 MISSION", 14, TEXT_FAINT, FONT_TITLE)
+
+local introSub = label(introContent, "BUILD YOUR SURVIVAL SUIT. FACE THE SOLAR SYSTEM.", 14, TEXT_DIM, FONT_TITLE)
 introSub.TextXAlignment = Enum.TextXAlignment.Center
 
-local introLine1 = label(introContent, "", 17, TEXT_DIM, FONT_BODY)
-introLine1.TextXAlignment = Enum.TextXAlignment.Center
-local introLine2 = label(introContent, "", 17, TEXT_DIM, FONT_BODY)
-introLine2.TextXAlignment = Enum.TextXAlignment.Center
-local introLine3 = label(introContent, "", 17, TEXT_DIM, FONT_BODY)
-introLine3.TextXAlignment = Enum.TextXAlignment.Center
-local introLine4 = label(introContent, "", 15, ACCENT, FONT_TITLE)
-introLine4.TextXAlignment = Enum.TextXAlignment.Center
+local spacer2 = Instance.new("Frame")
+spacer2.Size = UDim2.new(1, 0, 0, 20)
+spacer2.BackgroundTransparency = 1
+spacer2.Parent = introContent
 
-local introDismiss = Instance.new("TextButton")
-introDismiss.Size = UDim2.new(0, 200, 0, 50)
-introDismiss.BackgroundColor3 = ACCENT
-introDismiss.TextColor3 = BG
-introDismiss.Font = FONT_TITLE
-introDismiss.TextSize = 16
-introDismiss.Text = "BEGIN"
-introDismiss.Visible = false
-introDismiss.Parent = introContent
-corner(introDismiss, 12)
--- center the button
-introDismiss.AnchorPoint = Vector2.new(0.5, 0)
-introDismiss.Position = UDim2.new(0.5, 0, 0, 0)
+local introCard = card(introContent, true)
+label(introCard, "Every planet in this game uses real NASA data from the NSSDC Planetary Fact Sheets.", 13, TEXT_DIM)
+label(introCard, "Surface temperature, atmospheric pressure, gravity, composition. Nothing is made up.", 13, TEXT_DIM)
+divider(introCard)
+label(introCard, "Collect materials scattered around the yard. Stack them as layers on your suit. Each material has real thermal conductivity, yield strength, density, and melting point.", 13, TEXT_DIM)
+divider(introCard)
+label(introCard, "Then pick a planet and survive 20 minutes.", 14, TEXT_WHITE, FONT_TITLE)
 
-local introShown = false
+local startBtn = btn(introContent, "Start", true)
+startBtn.Size = UDim2.new(1, 0, 0, 48)
 
-local function typewrite(lbl: TextLabel, text: string, speed: number?)
-	local delay = speed or 0.03
-	lbl.Text = ""
-	for i = 1, #text do
-		lbl.Text = string.sub(text, 1, i)
-		task.wait(delay)
-	end
-end
+-- ── Objectives ──────────────────────────────────────────────────────────
+local note = page("Note")
 
-local function showIntro()
-	if introShown then return end
-	introShown = true
-	introFrame.Visible = true
+local noteContent = Instance.new("Frame")
+noteContent.Size = UDim2.new(1, 0, 0, 0)
+noteContent.AutomaticSize = Enum.AutomaticSize.Y
+noteContent.BackgroundTransparency = 1
+listLayout(noteContent, 10)
+noteContent.Parent = note
 
-	task.spawn(function()
-		task.wait(1)
-		typewrite(introLine1, "Every planet in our solar system is real.")
-		task.wait(0.5)
-		typewrite(introLine2, "The gravity, the pressure, the temperature. All from NASA.")
-		task.wait(0.5)
-		typewrite(introLine3, "Build a suit from raw materials. Survive 20 minutes.")
-		task.wait(0.8)
-		typewrite(introLine4, "The physics decides if you live or die.", 0.04)
-		task.wait(0.5)
-		introDismiss.Visible = true
-		-- fade in button
-		introDismiss.BackgroundTransparency = 1
-		introDismiss.TextTransparency = 1
-		TweenService:Create(introDismiss, TweenInfo.new(0.5), {
-			BackgroundTransparency = 0,
-			TextTransparency = 0,
-		}):Play()
-	end)
-end
+label(noteContent, "OBJECTIVES", 11, ACCENT, FONT_TITLE)
+divider(noteContent)
 
-introDismiss.MouseButton1Click:Connect(function()
-	-- fade out intro
-	TweenService:Create(introFrame, TweenInfo.new(0.6), {
-		BackgroundTransparency = 1,
-	}):Play()
-	for _, child in introContent:GetChildren() do
-		if child:IsA("TextLabel") then
-			TweenService:Create(child, TweenInfo.new(0.4), { TextTransparency = 1 }):Play()
+local objCard = card(noteContent, true)
+label(objCard, "1. Walk to glowing material piles and press E to collect.", 13, TEXT_WHITE)
+label(objCard, "2. Open the workshop to build your suit layer by layer.", 13, TEXT_WHITE)
+label(objCard, "3. Pick a planet, choose a side (hot or cold), and deploy.", 13, TEXT_WHITE)
+label(objCard, "4. Survive 20 real-time minutes using only what you built.", 13, TEXT_WHITE)
+
+local hintLabel = label(noteContent, "", 12, WARNING, FONT_MONO)
+
+local openBuild = btn(noteContent, "Open Workshop", true)
+
+-- ── Workshop ────────────────────────────────────────────────────────────
+local workshop = page("Workshop")
+
+local function designFrom(d)
+	if d == nil then return Design.emptyDesign() end
+	local design = { layers = {}, oxygenKg = d.oxygenKg or 0 }
+	if d.layers ~= nil then
+		for _, layer in d.layers do
+			table.insert(design.layers, { materialId = layer.materialId, thicknessM = layer.thicknessM })
 		end
 	end
-	TweenService:Create(introDismiss, TweenInfo.new(0.3), {
-		BackgroundTransparency = 1,
-		TextTransparency = 1,
-	}):Play()
-	task.wait(0.7)
-	introFrame.Visible = false
-end)
-
--- ── Objective tracker ────────────────────────────────────────────────────
-
-local objective = Instance.new("Frame")
-objective.Name = "Objective"
-objective.Size = UDim2.fromOffset(350, 0)
-objective.AutomaticSize = Enum.AutomaticSize.Y
-objective.Position = UDim2.new(1, -370, 0, 60)
-objective.BackgroundColor3 = BG_PANEL
-objective.BackgroundTransparency = 0.15
-objective.BorderSizePixel = 0
-objective.Parent = gui
-corner(objective, 12)
-pad(objective, 12, 12, 14, 14)
-listLayout(objective, 6)
-
-local objTag = label(objective, "OBJECTIVE", 10, ACCENT, FONT_TITLE)
-local objText = label(objective, "Pick up materials from the yard. Build a survival suit.", 15, TEXT_WHITE, FONT_BODY)
-local objHint = label(objective, "", 13, TEXT_DIM, FONT_BODY)
-
-local function setObjective(text: string, hint: string?)
-	objText.Text = text
-	objHint.Text = hint or ""
-	objHint.Visible = hint ~= nil and hint ~= ""
+	return design
 end
 
--- ── Note (home panel) ────────────────────────────────────────────────────
-
-local note = Instance.new("Frame")
-note.Name = "Note"
-note.Size = UDim2.fromOffset(420, 0)
-note.AutomaticSize = Enum.AutomaticSize.Y
-note.Position = UDim2.new(0, 20, 0, 60)
-note.BackgroundColor3 = BG_PANEL
-note.BackgroundTransparency = 0.02
-note.Parent = gui
-corner(note, 16)
-stroke(note, ACCENT_DIM, 1, 0.8)
-listLayout(note, 10)
-pad(note, 20, 20, 20, 20)
-label(note, "MISSION PREP", 11, ACCENT, FONT_TITLE)
-label(note, "Build a survival suit", 24, TEXT_WHITE, FONT_DISPLAY)
-label(note, "Collect materials from the yard, then assemble shell, insulation, and oxygen on the build pads.", 14, TEXT_DIM)
-divider(note)
-local noteHint = label(note, "Walk to the glowing pads to collect materials.", 14, ACCENT)
-local openBuild = btn(note, "Open the workshop", true)
-
-local workshop = page("Workshop")
-local planets = page("Planets")
-local difficulty = page("Difficulty")
-local debrief = page("Debrief")
-
--- HUD (mission overlay)
-local hud = Instance.new("Frame")
-hud.Name = "Hud"
-hud.Visible = false
-hud.Size = UDim2.fromOffset(300, 0)
-hud.AutomaticSize = Enum.AutomaticSize.Y
-hud.Position = UDim2.new(0, 20, 0, 60)
-hud.BackgroundColor3 = BG_PANEL
-hud.BackgroundTransparency = 0.05
-hud.Parent = gui
-corner(hud, 14)
-stroke(hud, DANGER, 1, 0.7)
-listLayout(hud, 8)
-pad(hud, 16, 16, 16, 16)
-
--- ── Clear / show ─────────────────────────────────────────────────────────
-
-local function show(which: ScrollingFrame?)
-	workshop.Visible = which == workshop
-	planets.Visible = which == planets
-	difficulty.Visible = which == difficulty
-	debrief.Visible = which == debrief
-	note.Visible = which == nil and hud.Visible == false
-	objective.Visible = which == nil or which == workshop
-end
-
--- ── State ────────────────────────────────────────────────────────────────
-
-local state = nil
-local chosenPlanet = nil
-local picked = nil
-
-local function designFrom(public)
-	return {
-		shellMaterialId = if public.shellMaterialId ~= "" then public.shellMaterialId else nil,
-		shellRadiusM = public.shellRadiusM,
-		shellThicknessM = public.shellThicknessM,
-		insulationMaterialId = if public.insulationMaterialId ~= "" then public.insulationMaterialId else nil,
-		insulationThicknessM = public.insulationThicknessM,
-		oxygenKg = public.oxygenKg,
-	}
-end
-
-local function materialName(id: string): string
-	if id == nil or id == "" then
-		return "empty"
-	end
-	return Catalog.materialById(id).name
-end
-
--- ── Workshop ─────────────────────────────────────────────────────────────
-
-local function renderWorkshop()
+function renderWorkshop()
 	clear(workshop)
 
-	label(workshop, "MISSION PREP", 11, ACCENT, FONT_TITLE)
-	label(workshop, "Suit assembly", 26, TEXT_WHITE, FONT_DISPLAY)
-	label(workshop, "Shell holds pressure. Wrap slows heat transfer. Air is your oxygen supply. The mass and thermal properties come from real physics.", 14, TEXT_DIM)
+	if state == nil then return end
 
+	local design = designFrom(state.design)
+
+	-- Header
+	label(workshop, "SUIT WORKSHOP", 11, ACCENT, FONT_TITLE)
 	divider(workshop)
-
-	-- Status
-	if state.hint ~= "" then
-		local hintCard = card(workshop)
-		label(hintCard, state.hint, 14, ACCENT)
-	end
-	if state.problem ~= "" then
-		local probCard = card(workshop, true)
-		label(probCard, "WARNING", 10, DANGER, FONT_TITLE)
-		label(probCard, state.problem, 14, DANGER)
-	end
 
 	-- Inventory
-	label(workshop, "COLLECTED MATERIALS", 10, TEXT_FAINT, FONT_TITLE)
-	local hasAny = false
+	local invCard = card(workshop, false)
+	label(invCard, "INVENTORY", 10, TEXT_FAINT, FONT_TITLE)
 	for _, material in Catalog.MATERIALS do
-		if (state.inventory[material.id] or 0) > 0 then
-			hasAny = true
-			local isPicked = picked == material.id
-			local matCard = card(workshop, isPicked)
-			if isPicked then
-				stroke(matCard, ACCENT, 1, 0.4)
-			end
-			local matRow = Instance.new("Frame")
-			matRow.BackgroundTransparency = 1
-			matRow.Size = UDim2.new(1, 0, 0, 0)
-			matRow.AutomaticSize = Enum.AutomaticSize.Y
-			matRow.Parent = matCard
-			listLayout(matRow, 2)
-			label(matRow, material.name, 16, if isPicked then ACCENT else TEXT_WHITE, FONT_TITLE)
-			label(matRow, material.blurb, 12, TEXT_DIM)
-			label(matRow, string.format("%.0f kg collected", material.foundKg), 11, TEXT_FAINT, FONT_MONO)
+		local kg = state.inventory[material.id] or 0
+		if kg > 0 then
+			local row = Instance.new("Frame")
+			row.Size = UDim2.new(1, 0, 0, 20)
+			row.BackgroundTransparency = 1
+			row.Parent = invCard
 
-			local selectBtn = Instance.new("TextButton")
-			selectBtn.Size = UDim2.new(1, 0, 0, 36)
-			selectBtn.BackgroundColor3 = if isPicked then ACCENT else BG_CARD_HI
-			selectBtn.TextColor3 = if isPicked then BG else TEXT_WHITE
-			selectBtn.Font = FONT_TITLE
-			selectBtn.TextSize = 14
-			selectBtn.Text = if isPicked then "SELECTED" else "Select"
-			selectBtn.AutoButtonColor = true
-			selectBtn.Parent = matCard
-			corner(selectBtn, 8)
-			selectBtn.MouseButton1Click:Connect(function()
-				picked = material.id
-				renderWorkshop()
-			end)
+			local dot = Instance.new("Frame")
+			dot.Size = UDim2.new(0, 8, 0, 8)
+			dot.Position = UDim2.new(0, 0, 0.5, -4)
+			dot.BackgroundColor3 = Color3.fromHex(material.color)
+			dot.BorderSizePixel = 0
+			corner(dot, 4)
+			dot.Parent = row
+
+			local name = Instance.new("TextLabel")
+			name.Size = UDim2.new(0.6, -14, 1, 0)
+			name.Position = UDim2.new(0, 14, 0, 0)
+			name.BackgroundTransparency = 1
+			name.FontFace = FONT_BODY
+			name.TextSize = 12
+			name.TextColor3 = TEXT_WHITE
+			name.TextXAlignment = Enum.TextXAlignment.Left
+			name.Text = material.name
+			name.Parent = row
+
+			local qty = Instance.new("TextLabel")
+			qty.Size = UDim2.new(0.35, 0, 1, 0)
+			qty.Position = UDim2.new(0.65, 0, 0, 0)
+			qty.BackgroundTransparency = 1
+			qty.FontFace = FONT_MONO
+			qty.TextSize = 11
+			qty.TextColor3 = TEXT_DIM
+			qty.TextXAlignment = Enum.TextXAlignment.Right
+			qty.Text = string.format("%.1f kg", kg)
+			qty.Parent = row
 		end
-	end
-	if not hasAny then
-		local emptyCard = card(workshop)
-		label(emptyCard, "No materials collected yet", 14, TEXT_DIM)
-		label(emptyCard, "Walk to the glowing pads in the yard and interact with them.", 13, TEXT_FAINT)
 	end
 
 	divider(workshop)
 
-	-- Slots
-	label(workshop, "SUIT CONFIGURATION", 10, TEXT_FAINT, FONT_TITLE)
-	local design = designFrom(state.design)
-	local slots = {
-		{ id = "shell", title = "Shell", subtitle = "Pressure containment", filled = materialName(design.shellMaterialId) },
-		{ id = "wrap",  title = "Insulation", subtitle = "Thermal barrier", filled = materialName(design.insulationMaterialId) },
-		{ id = "air",   title = "Oxygen", subtitle = "Breathing supply", filled = if design.oxygenKg > 0 then string.format("%.1f kg loaded", design.oxygenKg) else "empty" },
-	}
-	for _, slot in slots do
-		local slotCard = card(workshop, slot.filled ~= "empty")
-		local isEmpty = slot.filled == "empty"
+	-- Current layers
+	local layerCard = card(workshop, true)
+	label(layerCard, "SUIT LAYERS (inner to outer)", 10, TEXT_FAINT, FONT_TITLE)
 
-		label(slotCard, slot.title, 16, if isEmpty then TEXT_DIM else TEXT_WHITE, FONT_TITLE)
-		label(slotCard, slot.subtitle, 11, TEXT_FAINT)
-		label(slotCard, if isEmpty then "Nothing assigned" else slot.filled, 13, if isEmpty then TEXT_FAINT else ACCENT, FONT_MONO)
+	if #design.layers == 0 then
+		label(layerCard, "No layers yet. Add materials below.", 12, TEXT_FAINT)
+	else
+		for i, layer in design.layers do
+			local mat = Catalog.materialById(layer.materialId)
+			local row = Instance.new("Frame")
+			row.Size = UDim2.new(1, 0, 0, 32)
+			row.BackgroundColor3 = BG
+			row.BorderSizePixel = 0
+			corner(row, 4)
+			row.Parent = layerCard
 
-		if picked ~= nil then
-			local placeBtn = btn(slotCard, "Place " .. Catalog.materialById(picked).name .. " here", true)
-			placeBtn.Size = UDim2.new(1, 0, 0, 40)
-			placeBtn.TextSize = 14
-			placeBtn.MouseButton1Click:Connect(function()
-				Place:FireServer(picked, slot.id)
-				picked = nil
-			end)
-		end
+			local num = Instance.new("TextLabel")
+			num.Size = UDim2.new(0, 24, 1, 0)
+			num.BackgroundTransparency = 1
+			num.FontFace = FONT_MONO
+			num.TextSize = 11
+			num.TextColor3 = ACCENT
+			num.Text = tostring(i)
+			num.Parent = row
 
-		if not isEmpty then
+			local dot = Instance.new("Frame")
+			dot.Size = UDim2.new(0, 8, 0, 8)
+			dot.Position = UDim2.new(0, 28, 0.5, -4)
+			dot.BackgroundColor3 = Color3.fromHex(mat.color)
+			dot.BorderSizePixel = 0
+			corner(dot, 4)
+			dot.Parent = row
+
+			local info = Instance.new("TextLabel")
+			info.Size = UDim2.new(1, -100, 1, 0)
+			info.Position = UDim2.new(0, 42, 0, 0)
+			info.BackgroundTransparency = 1
+			info.FontFace = FONT_BODY
+			info.TextSize = 12
+			info.TextColor3 = TEXT_WHITE
+			info.TextXAlignment = Enum.TextXAlignment.Left
+			info.Text = mat.name .. "  " .. string.format("%.0f mm", layer.thicknessM * 1000)
+			info.Parent = row
+
+			local tag = Instance.new("TextLabel")
+			tag.Size = UDim2.new(0, 40, 0, 16)
+			tag.Position = UDim2.new(1, -80, 0.5, -8)
+			tag.BackgroundColor3 = if mat.structural then ACCENT else WARNING
+			tag.BackgroundTransparency = 0.8
+			tag.FontFace = FONT_MONO
+			tag.TextSize = 9
+			tag.TextColor3 = if mat.structural then ACCENT else WARNING
+			tag.Text = if mat.structural then "STRUCT" else "INSUL"
+			corner(tag, 3)
+			tag.Parent = row
+
 			local removeBtn = Instance.new("TextButton")
-			removeBtn.Size = UDim2.new(1, 0, 0, 28)
-			removeBtn.BackgroundTransparency = 1
+			removeBtn.Size = UDim2.new(0, 28, 0, 28)
+			removeBtn.Position = UDim2.new(1, -30, 0.5, -14)
+			removeBtn.BackgroundColor3 = DANGER
+			removeBtn.BackgroundTransparency = 0.8
+			removeBtn.FontFace = FONT_TITLE
+			removeBtn.TextSize = 14
 			removeBtn.TextColor3 = DANGER
-			removeBtn.Font = FONT_BODY
-			removeBtn.TextSize = 12
-			removeBtn.Text = "Remove"
-			removeBtn.Parent = slotCard
+			removeBtn.Text = "X"
+			removeBtn.AutoButtonColor = false
+			corner(removeBtn, 4)
+			removeBtn.Parent = row
+
+			local idx = i
 			removeBtn.MouseButton1Click:Connect(function()
-				ClearSlot:FireServer(slot.id)
+				RemoveLayer:FireServer(idx)
 			end)
 		end
 	end
 
+	-- Oxygen
 	divider(workshop)
-
-	-- Suit size
-	label(workshop, "SUIT SIZE", 10, TEXT_FAINT, FONT_TITLE)
-	local sizeRow = Instance.new("Frame")
-	sizeRow.BackgroundTransparency = 1
-	sizeRow.Size = UDim2.new(1, 0, 0, 42)
-	sizeRow.Parent = workshop
-	local sizeLayout = Instance.new("UIListLayout")
-	sizeLayout.FillDirection = Enum.FillDirection.Horizontal
-	sizeLayout.Padding = UDim.new(0, 6)
-	sizeLayout.Parent = sizeRow
-	for _, size in { { "fits", "Standard" }, { "bigger", "Large" }, { "bulky", "Heavy" } } do
-		local sizeButton = Instance.new("TextButton")
-		sizeButton.Size = UDim2.new(0.32, 0, 1, 0)
-		sizeButton.BackgroundColor3 = BG_CARD
-		sizeButton.TextColor3 = TEXT_WHITE
-		sizeButton.Font = FONT_TITLE
-		sizeButton.TextSize = 14
-		sizeButton.Text = size[2]
-		sizeButton.AutoButtonColor = true
-		sizeButton.Parent = sizeRow
-		corner(sizeButton, 8)
-		sizeButton.MouseButton1Click:Connect(function()
-			SetSize:FireServer(size[1])
+	local o2Card = card(workshop, false)
+	label(o2Card, "OXYGEN", 10, TEXT_FAINT, FONT_TITLE)
+	local oxygenAvail = state.inventory.oxygen or 0
+	label(o2Card, string.format("Packed: %.1f kg  /  Available: %.1f kg", design.oxygenKg, oxygenAvail), 12, TEXT_WHITE, FONT_MONO)
+	if oxygenAvail > 0 then
+		local packAll = btn(o2Card, "Pack all oxygen", false)
+		packAll.Size = UDim2.new(1, 0, 0, 32)
+		packAll.MouseButton1Click:Connect(function()
+			SetOxygen:FireServer(oxygenAvail)
+		end)
+		local packNone = btn(o2Card, "Remove oxygen", false)
+		packNone.Size = UDim2.new(1, 0, 0, 32)
+		packNone.MouseButton1Click:Connect(function()
+			SetOxygen:FireServer(0)
 		end)
 	end
 
+	-- Add layer
+	divider(workshop)
+	label(workshop, "ADD LAYER", 10, TEXT_FAINT, FONT_TITLE)
+
+	for _, material in Catalog.MATERIALS do
+		if material.id == "oxygen" then continue end
+		local kg = state.inventory[material.id] or 0
+		if kg <= 0 then continue end
+
+		local matCard = card(workshop, false)
+		local hdr = Instance.new("Frame")
+		hdr.Size = UDim2.new(1, 0, 0, 20)
+		hdr.BackgroundTransparency = 1
+		hdr.Parent = matCard
+
+		local dot = Instance.new("Frame")
+		dot.Size = UDim2.new(0, 10, 0, 10)
+		dot.Position = UDim2.new(0, 0, 0.5, -5)
+		dot.BackgroundColor3 = Color3.fromHex(material.color)
+		dot.BorderSizePixel = 0
+		corner(dot, 5)
+		dot.Parent = hdr
+
+		local matName = Instance.new("TextLabel")
+		matName.Size = UDim2.new(1, -16, 1, 0)
+		matName.Position = UDim2.new(0, 16, 0, 0)
+		matName.BackgroundTransparency = 1
+		matName.FontFace = FONT_TITLE
+		matName.TextSize = 13
+		matName.TextColor3 = TEXT_WHITE
+		matName.TextXAlignment = Enum.TextXAlignment.Left
+		matName.Text = material.name
+		matName.Parent = hdr
+
+		label(matCard, material.blurb, 11, TEXT_DIM)
+
+		-- Stats row
+		local stats = string.format("k=%.3f W/mK  |  yield=%s  |  melts=%dK  |  %.0f kg/m3",
+			material.conductivity,
+			if material.structural then string.format("%.0f MPa", material.yieldPa / 1e6) else "N/A",
+			material.meltingK,
+			material.densityKgM3
+		)
+		label(matCard, stats, 10, TEXT_FAINT, FONT_MONO)
+
+		-- Thickness buttons
+		local thickRow = Instance.new("Frame")
+		thickRow.Size = UDim2.new(1, 0, 0, 32)
+		thickRow.BackgroundTransparency = 1
+		thickRow.Parent = matCard
+
+		local thickLayout = Instance.new("UIListLayout")
+		thickLayout.FillDirection = Enum.FillDirection.Horizontal
+		thickLayout.Padding = UDim.new(0, 6)
+		thickLayout.Parent = thickRow
+
+		for _, opt in Design.THICKNESS_OPTIONS do
+			local tb = Instance.new("TextButton")
+			tb.Size = UDim2.new(0.24, -5, 1, 0)
+			tb.BackgroundColor3 = BG_CARD
+			tb.FontFace = FONT_MONO
+			tb.TextSize = 11
+			tb.TextColor3 = ACCENT
+			tb.Text = opt.label .. "\n" .. string.format("%.0fmm", opt.meters * 1000)
+			tb.AutoButtonColor = false
+			tb.BorderSizePixel = 0
+			corner(tb, 4)
+			stroke(tb, ACCENT, 1, 0.7)
+			tb.Parent = thickRow
+
+			local matId = material.id
+			local thickId = opt.id
+			tb.MouseButton1Click:Connect(function()
+				AddLayer:FireServer(matId, thickId)
+			end)
+
+			tb.MouseEnter:Connect(function()
+				TweenService:Create(tb, TweenInfo.new(0.1), {BackgroundColor3 = BG_CARD_HOV}):Play()
+			end)
+			tb.MouseLeave:Connect(function()
+				TweenService:Create(tb, TweenInfo.new(0.1), {BackgroundColor3 = BG_CARD}):Play()
+			end)
+		end
+	end
+
+	-- Suit stats
+	divider(workshop)
+	local statsCard = card(workshop, true)
+	label(statsCard, "SUIT SUMMARY", 10, TEXT_FAINT, FONT_TITLE)
+	local totalMass = Design.designMassKg(design)
+	local sealed = Design.isSealed(design)
+	label(statsCard, string.format("Total mass: %.1f kg", totalMass), 12, TEXT_WHITE, FONT_MONO)
+	label(statsCard, "Sealed: " .. (if sealed then "YES" else "NO (need a structural layer)"), 12, if sealed then SUCCESS else DANGER, FONT_MONO)
+	label(statsCard, string.format("Layers: %d / 8", #design.layers), 12, TEXT_DIM, FONT_MONO)
+
+	-- Hint / problem
+	if state.problem ~= "" and state.problem ~= nil then
+		label(statsCard, state.problem, 12, DANGER, FONT_MONO)
+	end
+	if state.hint ~= nil and state.hint ~= "" then
+		label(statsCard, state.hint, 11, WARNING)
+	end
+
 	divider(workshop)
 
-	-- Preview
-	label(workshop, "SURVIVAL PREVIEW", 10, TEXT_FAINT, FONT_TITLE)
-	local check = Catalog.difficultyById("normal").minSafetyFactor
-	local moon = Catalog.planetById("moon")
-	local previewCard = card(workshop)
-	label(previewCard, "Moon (Normal difficulty)", 14, TEXT_WHITE, FONT_TITLE)
-	label(previewCard, Survival.kidResult(design, moon, check, "hot"), 12, TEXT_DIM, FONT_MONO)
-	label(previewCard, Survival.kidResult(design, moon, check, "cold"), 12, TEXT_DIM, FONT_MONO)
-
-	-- Launch
-	local ready = state.problem == ""
-	local go = btn(workshop, if ready then "SELECT MISSION" else "Fix warnings first", ready)
-	if not ready then
-		go.BackgroundColor3 = BG_CARD
-		go.TextColor3 = TEXT_FAINT
-		go.Active = false
-		go.AutoButtonColor = false
-	end
-	go.MouseButton1Click:Connect(function()
-		if ready then
-			show(planets)
-			renderPlanets()
-		end
+	local toPlanets = btn(workshop, "Choose destination", true)
+	toPlanets.Size = UDim2.new(1, 0, 0, 44)
+	toPlanets.MouseButton1Click:Connect(function()
+		show(planets)
+		renderPlanets()
 	end)
-
-	-- Update objective
-	if not hasAny then
-		setObjective("Collect materials from the yard.", "Walk to the glowing pads nearby.")
-	elseif state.problem ~= "" then
-		setObjective("Complete your suit build.", state.problem)
-	else
-		setObjective("Suit ready. Select a mission.", "Open the workshop and choose SELECT MISSION.")
-	end
 end
 
 openBuild.MouseButton1Click:Connect(function()
@@ -588,9 +599,14 @@ openBuild.MouseButton1Click:Connect(function()
 	end
 end)
 
--- ── Planets (mission select) ────────────────────────────────────────────
+-- ── Planets ─────────────────────────────────────────────────────────────
+local planets = page("Planets")
+
+local DEMO_MODE = true
 
 local function isOpen(planetId: string): boolean
+	if DEMO_MODE then return true end
+	if state == nil then return false end
 	local previous = nil
 	local cleared = {}
 	for _, id in state.clears do
@@ -608,81 +624,76 @@ end
 function renderPlanets()
 	clear(planets)
 
-	label(planets, "MISSION SELECT", 11, ACCENT, FONT_TITLE)
-	label(planets, "Choose your planet", 26, TEXT_WHITE, FONT_DISPLAY)
-	label(planets, "All planet data comes from NASA NSSDC fact sheets. The numbers below are real. Your suit either handles them or it doesn't.", 14, TEXT_DIM)
-
-	divider(planets)
+	if state == nil then return end
 
 	local design = designFrom(state.design)
-	local check = Catalog.difficultyById("normal").minSafetyFactor
+	local check = 1.5
+
+	label(planets, "DESTINATIONS", 11, ACCENT, FONT_TITLE)
+	label(planets, "NASA NSSDC Planetary Fact Sheets", 10, TEXT_FAINT, FONT_MONO)
+	divider(planets)
+
 	for _, planetId in Sources.DESTINATION_ORDER do
 		local planet = Catalog.planetById(planetId)
 		local open = isOpen(planetId)
-		local cleared = false
-		for _, id in state.clears do
-			if id == planetId then cleared = true end
+		local wasCleared = false
+		if state.clears then
+			for _, id in state.clears do
+				if id == planetId then wasCleared = true end
+			end
 		end
 
 		local planetCard = card(planets, open)
-		if cleared then
-			stroke(planetCard, SUCCESS, 1, 0.5)
+		if wasCleared then
+			stroke(planetCard, SUCCESS, 1, 0.3)
 		end
 
-		-- Planet header
-		local header = Instance.new("Frame")
-		header.BackgroundTransparency = 1
-		header.Size = UDim2.new(1, 0, 0, 0)
-		header.AutomaticSize = Enum.AutomaticSize.Y
-		header.Parent = planetCard
-		listLayout(header, 2)
-
+		-- Header row
 		local nameRow = Instance.new("Frame")
+		nameRow.Size = UDim2.new(1, 0, 0, 24)
 		nameRow.BackgroundTransparency = 1
-		nameRow.Size = UDim2.new(1, 0, 0, 28)
-		nameRow.Parent = header
+		nameRow.Parent = planetCard
 
 		local planetName = Instance.new("TextLabel")
 		planetName.BackgroundTransparency = 1
-		planetName.Font = FONT_TITLE
-		planetName.TextSize = 20
+		planetName.Size = UDim2.new(0.7, 0, 1, 0)
+		planetName.FontFace = FONT_TITLE
+		planetName.TextSize = 18
 		planetName.TextColor3 = if open then TEXT_WHITE else TEXT_FAINT
 		planetName.TextXAlignment = Enum.TextXAlignment.Left
 		planetName.Text = planet.name
-		planetName.Size = UDim2.new(0.7, 0, 1, 0)
 		planetName.Parent = nameRow
 
-		if cleared then
+		if wasCleared then
 			local badge = Instance.new("TextLabel")
 			badge.BackgroundTransparency = 1
-			badge.Font = FONT_TITLE
-			badge.TextSize = 12
+			badge.Size = UDim2.new(0.3, 0, 1, 0)
+			badge.FontFace = FONT_TITLE
+			badge.TextSize = 11
 			badge.TextColor3 = SUCCESS
 			badge.TextXAlignment = Enum.TextXAlignment.Right
 			badge.Text = "SURVIVED"
-			badge.Size = UDim2.new(0.3, 0, 1, 0)
 			badge.Parent = nameRow
 		end
 
-		-- Key stats
 		if open then
-			label(header, string.format("Gravity: %.2f m/s\u{00B2}  |  %s", planet.gravityMs2, planet.role), 12, ACCENT, FONT_MONO)
+			label(planetCard, string.format("Gravity: %.2f m/s2  |  %s", planet.gravityMs2, planet.role), 11, ACCENT, FONT_MONO)
 
-			-- Quick survival check
 			local hotResult = Survival.kidResult(design, planet, check, "hot")
 			local coldResult = Survival.kidResult(design, planet, check, "cold")
-			label(header, hotResult, 11, TEXT_DIM, FONT_MONO)
+			label(planetCard, hotResult, 10, TEXT_DIM, FONT_MONO)
+			label(planetCard, coldResult, 10, TEXT_DIM, FONT_MONO)
 
-			local choose = btn(planetCard, "BRIEFING", true)
-			choose.Size = UDim2.new(1, 0, 0, 42)
+			local choose = btn(planetCard, "Briefing", true)
+			choose.Size = UDim2.new(1, 0, 0, 38)
 			choose.MouseButton1Click:Connect(function()
 				chosenPlanet = planetId
 				show(difficulty)
 				renderDifficulty()
 			end)
 		else
-			label(header, "LOCKED", 12, TEXT_FAINT, FONT_TITLE)
-			label(header, "Clear the previous planet to unlock.", 12, TEXT_FAINT)
+			label(planetCard, "LOCKED", 12, TEXT_FAINT, FONT_TITLE)
+			label(planetCard, "Clear the previous planet to unlock.", 11, TEXT_FAINT)
 		end
 	end
 
@@ -695,271 +706,255 @@ function renderPlanets()
 	end)
 end
 
--- ── Difficulty (mission briefing) ────────────────────────────────────────
+-- ── Difficulty / Briefing ───────────────────────────────────────────────
+local difficulty = page("Difficulty")
 
 function renderDifficulty()
 	clear(difficulty)
+
+	if chosenPlanet == nil then return end
+
 	local planet = Catalog.planetById(chosenPlanet)
 
 	label(difficulty, "MISSION BRIEFING", 11, ACCENT, FONT_TITLE)
-	label(difficulty, planet.name, 32, TEXT_WHITE, FONT_DISPLAY)
-
-	-- Planet facts
-	local factsCard = card(difficulty)
-	label(factsCard, "PLANET DATA (NASA NSSDC)", 10, ACCENT, FONT_TITLE)
-	label(factsCard, string.format("Surface gravity: %.2f m/s\u{00B2}", planet.gravityMs2), 13, TEXT_WHITE, FONT_MONO)
-	label(factsCard, string.format("Surface pressure: %s", planet.referencePressure.transcribedFrom), 13, TEXT_WHITE, FONT_MONO)
-	if planet.escapeVelocityMs then
-		label(factsCard, string.format("Escape velocity: %.0f m/s", planet.escapeVelocityMs), 13, TEXT_DIM, FONT_MONO)
-	end
-	label(factsCard, planet.sourceUrl, 10, ACCENT_DIM, FONT_MONO)
+	label(difficulty, planet.name, 28, TEXT_WHITE, FONT_DISPLAY)
+	label(difficulty, planet.role, 12, ACCENT)
 
 	divider(difficulty)
 
-	label(difficulty, "DIFFICULTY", 10, TEXT_FAINT, FONT_TITLE)
-	label(difficulty, "Changes the rules, not the planet.", 13, TEXT_DIM)
+	-- NASA data card
+	local dataCard = card(difficulty, true)
+	label(dataCard, "FROM THE NASA FACT SHEET", 9, TEXT_FAINT, FONT_TITLE)
+	label(dataCard, string.format("Gravity: %.2f m/s2", planet.gravityMs2), 12, TEXT_WHITE, FONT_MONO)
+	label(dataCard, "Pressure: " .. planet.referencePressure.transcribedFrom, 11, TEXT_DIM, FONT_MONO)
+
+	for _, reading in planet.temperatures do
+		label(dataCard, reading.transcribedFrom, 11, TEXT_DIM, FONT_MONO)
+	end
+
+	label(dataCard, planet.sourceUrl, 10, ACCENT, FONT_MONO)
+
+	divider(difficulty)
+
+	-- Difficulty selection
+	label(difficulty, "DIFFICULTY", 11, TEXT_FAINT, FONT_TITLE)
 
 	for _, profile in Catalog.DIFFICULTIES do
-		local diffCard = card(difficulty)
-		label(diffCard, profile.label, 18, TEXT_WHITE, FONT_TITLE)
-		label(diffCard, profile.summary, 12, TEXT_DIM)
-		local pick = btn(diffCard, "Select " .. profile.label, profile.id == "normal")
-		pick.Size = UDim2.new(1, 0, 0, 42)
-		pick.MouseButton1Click:Connect(function()
-			clear(difficulty)
-			label(difficulty, "LAUNCH", 11, DANGER, FONT_TITLE)
-			label(difficulty, planet.name, 32, TEXT_WHITE, FONT_DISPLAY)
-			label(difficulty, profile.label .. " difficulty", 14, ACCENT)
+		local dc = card(difficulty, false)
+		label(dc, profile.label, 16, TEXT_WHITE, FONT_TITLE)
+		label(dc, profile.summary, 11, TEXT_DIM)
+		label(dc, string.format("Safety factor: %.1fx  |  Score: %.1fx", profile.minSafetyFactor, profile.scoreMultiplier), 10, TEXT_FAINT, FONT_MONO)
 
-			divider(difficulty)
+		-- Side selection
+		divider(dc)
+		label(dc, "DEPLOY SIDE", 10, TEXT_FAINT, FONT_TITLE)
 
-			local hot = Survival.exposure(planet, "hot")
-			local cold = Survival.exposure(planet, "cold")
+		local sideRow = Instance.new("Frame")
+		sideRow.Size = UDim2.new(1, 0, 0, 38)
+		sideRow.BackgroundTransparency = 1
+		sideRow.Parent = dc
 
-			label(difficulty, "LANDING ZONE", 10, TEXT_FAINT, FONT_TITLE)
-			label(difficulty, "Each planet has a hot side (facing the sun) and a cold side. The temperature difference can be hundreds of degrees.", 13, TEXT_DIM)
+		local sideLayout = Instance.new("UIListLayout")
+		sideLayout.FillDirection = Enum.FillDirection.Horizontal
+		sideLayout.Padding = UDim.new(0, 8)
+		sideLayout.Parent = sideRow
 
-			local hotCard = card(difficulty, true)
-			stroke(hotCard, ACCENT, 1, 0.5)
-			label(hotCard, "HOT SIDE", 10, ACCENT, FONT_TITLE)
-			label(hotCard, string.format("%.0f \u{00B0}C", Survival.celsius(hot.kelvin)), 28, ACCENT, FONT_DISPLAY)
-			label(hotCard, hot.transcribedFrom, 11, TEXT_DIM, FONT_MONO)
-			local hotBtn = btn(hotCard, "DEPLOY TO HOT SIDE", true)
-			hotBtn.Size = UDim2.new(1, 0, 0, 46)
-			hotBtn.MouseButton1Click:Connect(function()
-				Depart:FireServer(planet.id, profile.id, "hot")
-				show(nil)
-				setObjective("Survive 20 minutes on " .. planet.name .. ".", "Hot side. " .. profile.label .. " difficulty.")
-			end)
+		local hotBtn = btn(sideRow, "Hot Side", true)
+		hotBtn.Size = UDim2.new(0.48, 0, 1, 0)
+		hotBtn.BackgroundColor3 = DANGER
+		hotBtn.TextColor3 = TEXT_WHITE
 
-			local coldCard = card(difficulty, true)
-			stroke(coldCard, COOL, 1, 0.5)
-			label(coldCard, "COLD SIDE", 10, COOL, FONT_TITLE)
-			label(coldCard, string.format("%.0f \u{00B0}C", Survival.celsius(cold.kelvin)), 28, COOL, FONT_DISPLAY)
-			label(coldCard, cold.transcribedFrom, 11, TEXT_DIM, FONT_MONO)
-			local coldBtn = btn(coldCard, "DEPLOY TO COLD SIDE", true)
-			coldBtn.BackgroundColor3 = COOL
-			coldBtn.Size = UDim2.new(1, 0, 0, 46)
-			coldBtn.MouseButton1Click:Connect(function()
-				Depart:FireServer(planet.id, profile.id, "cold")
-				show(nil)
-				setObjective("Survive 20 minutes on " .. planet.name .. ".", "Cold side. " .. profile.label .. " difficulty.")
-			end)
+		local coldBtn = btn(sideRow, "Cold Side", true)
+		coldBtn.Size = UDim2.new(0.48, 0, 1, 0)
+		coldBtn.BackgroundColor3 = COOL
+		coldBtn.TextColor3 = BG
+
+		local diffId = profile.id
+		hotBtn.MouseButton1Click:Connect(function()
+			DepartEvent:FireServer(chosenPlanet, diffId, "hot")
+		end)
+		coldBtn.MouseButton1Click:Connect(function()
+			DepartEvent:FireServer(chosenPlanet, diffId, "cold")
 		end)
 	end
 
 	divider(difficulty)
 
-	local back = btn(difficulty, "Back to mission select", false)
+	local back = btn(difficulty, "Back to planets", false)
 	back.MouseButton1Click:Connect(function()
 		show(planets)
 		renderPlanets()
 	end)
 end
 
--- ── HUD (mission) ────────────────────────────────────────────────────────
+-- ── HUD ─────────────────────────────────────────────────────────────────
+local hud = Instance.new("Frame")
+hud.Name = "HUD"
+hud.Size = UDim2.new(0, 260, 0, 0)
+hud.AutomaticSize = Enum.AutomaticSize.Y
+hud.Position = UDim2.new(1, -276, 0, 16)
+hud.BackgroundColor3 = BG_PANEL
+hud.BackgroundTransparency = 0.15
+hud.BorderSizePixel = 0
+hud.Visible = false
+corner(hud, 8)
+stroke(hud, BORDER, 1, 0.5)
+pad(hud, 10, 10, 10, 10)
+listLayout(hud, 4)
+hud.Parent = gui
 
-local hudTag = label(hud, "MISSION ACTIVE", 10, DANGER, FONT_TITLE)
-local hudPlanet = label(hud, "", 22, TEXT_WHITE, FONT_DISPLAY)
-local hudSide = label(hud, "", 12, ACCENT, FONT_TITLE)
-local hudClock = label(hud, "0:00 / 20:00", 20, TEXT_WHITE, FONT_MONO)
+local hudTitle = label(hud, "MISSION", 10, ACCENT, FONT_TITLE)
+local hudPlanet = label(hud, "", 16, TEXT_WHITE, FONT_TITLE)
+local hudSide = label(hud, "", 11, TEXT_DIM, FONT_MONO)
+local hudClock = label(hud, "0:00 / 20:00", 18, TEXT_WHITE, FONT_MONO)
+hudClock.TextXAlignment = Enum.TextXAlignment.Center
 
-divider(hud)
+local _, airFill = meter(hud, "AIR SEAL", 100, 100, ACCENT)
+local _, tempFill = meter(hud, "CORE TEMP", 37, 50, WARNING)
+local _, o2Fill = meter(hud, "OXYGEN", 1, 2, COOL)
 
-local hudAirHolder = Instance.new("Frame")
-hudAirHolder.BackgroundTransparency = 1
-hudAirHolder.Size = UDim2.new(1, 0, 0, 30)
-hudAirHolder.Parent = hud
+local hudDeath = Instance.new("Frame")
+hudDeath.Size = UDim2.new(1, 0, 0, 0)
+hudDeath.AutomaticSize = Enum.AutomaticSize.Y
+hudDeath.BackgroundColor3 = DANGER
+hudDeath.BackgroundTransparency = 0.85
+hudDeath.BorderSizePixel = 0
+hudDeath.Visible = false
+corner(hudDeath, 6)
+pad(hudDeath, 8, 8, 8, 8)
+listLayout(hudDeath, 4)
+hudDeath.Parent = hud
 
-local hudCoreHolder = Instance.new("Frame")
-hudCoreHolder.BackgroundTransparency = 1
-hudCoreHolder.Size = UDim2.new(1, 0, 0, 30)
-hudCoreHolder.Parent = hud
-
-local hudOxygenHolder = Instance.new("Frame")
-hudOxygenHolder.BackgroundTransparency = 1
-hudOxygenHolder.Size = UDim2.new(1, 0, 0, 30)
-hudOxygenHolder.Parent = hud
-
-divider(hud)
-
-local hudDeath = label(hud, "", 15, DANGER, FONT_TITLE)
-local diedBtn = btn(hud, "VIEW DEBRIEF", true)
-diedBtn.Visible = false
-diedBtn.BackgroundColor3 = DANGER
-diedBtn.Size = UDim2.new(1, 0, 0, 42)
-diedBtn.MouseButton1Click:Connect(function()
-	hud.Visible = false
-	debrief.Visible = true
-end)
+local deathLabel = label(hudDeath, "", 13, DANGER, FONT_TITLE)
 
 local abortBtn = btn(hud, "Abort mission", false)
-abortBtn.BackgroundColor3 = BG_CARD
+abortBtn.Size = UDim2.new(1, 0, 0, 32)
 abortBtn.TextColor3 = DANGER
-abortBtn.Size = UDim2.new(1, 0, 0, 38)
-abortBtn.TextSize = 13
 abortBtn.MouseButton1Click:Connect(function()
-	Abort:FireServer()
-	show(workshop)
-	if state then renderWorkshop() end
+	AbortEvent:FireServer()
 end)
 
 local function clock(seconds: number): string
-	local whole = math.max(0, math.floor(seconds))
-	return string.format("%d:%02d", math.floor(whole / 60), whole % 60)
+	local m = math.floor(seconds / 60)
+	local s = math.floor(seconds % 60)
+	return string.format("%d:%02d", m, s)
 end
 
 local function renderHud()
-	local inMission = player:GetAttribute("InMission") == true
-	hud.Visible = inMission
-	objective.Visible = inMission
-	if inMission then
-		note.Visible = false
-	end
-	if not inMission then
-		return
-	end
-	show(nil)
-	hud.Visible = true
-	objective.Visible = true
+	local inMission = player:GetAttribute("InMission")
+	hud.Visible = inMission == true
 
-	local planetName = player:GetAttribute("MissionPlanet") or ""
-	local side = player:GetAttribute("MissionSide") or ""
-	local mode = player:GetAttribute("MissionDifficulty") or ""
-	hudPlanet.Text = planetName
-	hudSide.Text = string.upper(side) .. " SIDE  ·  " .. string.upper(mode)
+	if not inMission then return end
+
+	hudPlanet.Text = player:GetAttribute("MissionPlanet") or ""
+	hudSide.Text = (player:GetAttribute("MissionSide") or "") .. "  |  " .. (player:GetAttribute("MissionDifficulty") or "")
 	hudClock.Text = clock(player:GetAttribute("MissionClock") or 0) .. " / 20:00"
 
-	-- Air held
-	local held = player:GetAttribute("AirHeld") or 100
-	for _, child in hudAirHolder:GetChildren() do child:Destroy() end
-	meter(hudAirHolder,
-		if held >= 100 then "AIR  SEALED" else string.format("AIR  LEAKING  %.0f%%", held),
-		held,
-		if held >= 100 then SUCCESS else ACCENT)
+	local airHeld = player:GetAttribute("AirHeld") or 100
+	airFill.Size = UDim2.new(math.clamp(airHeld / 100, 0, 1), 0, 1, 0)
+	airFill.BackgroundColor3 = if airHeld < 30 then DANGER else ACCENT
 
-	-- Core temp
 	local coreC = player:GetAttribute("CoreC") or 37
-	local corePct = math.clamp(((coreC - 30) / 15) * 100, 0, 100)
-	for _, child in hudCoreHolder:GetChildren() do child:Destroy() end
-	meter(hudCoreHolder,
-		string.format("CORE  %.1f \u{00B0}C", coreC),
-		corePct,
-		if coreC < 35 or coreC > 40 then DANGER else SUCCESS)
+	local tempPct = math.clamp((coreC + 10) / 60, 0, 1)
+	tempFill.Size = UDim2.new(tempPct, 0, 1, 0)
+	tempFill.BackgroundColor3 = if coreC > 39 then DANGER elseif coreC < 35 then COOL else SUCCESS
 
-	-- Oxygen
-	local oxyKg = player:GetAttribute("OxygenKg") or 0
-	local oxyPct = math.clamp(oxyKg / 2 * 100, 0, 100)
-	for _, child in hudOxygenHolder:GetChildren() do child:Destroy() end
-	meter(hudOxygenHolder,
-		string.format("O\u{2082}  %.3f kg", oxyKg),
-		oxyPct,
-		if oxyPct < 20 then DANGER else SUCCESS)
+	local oxygenKg = player:GetAttribute("OxygenKg") or 0
+	local maxO2 = if state and state.design then (state.design.oxygenKg or 2) else 2
+	o2Fill.Size = UDim2.new(math.clamp(oxygenKg / math.max(maxO2, 0.1), 0, 1), 0, 1, 0)
+	o2Fill.BackgroundColor3 = if oxygenKg < 0.3 then DANGER else COOL
 
-	local alive = player:GetAttribute("Alive") ~= false
-	local cause = player:GetAttribute("CauseTitle") or ""
-	hudDeath.Text = if alive then "" else cause
-	diedBtn.Visible = not alive
-	diedBtn.Text = if alive then "" else "VIEW DEBRIEF"
-	abortBtn.Visible = alive
+	local alive = player:GetAttribute("Alive")
+	local causeTitle = player:GetAttribute("CauseTitle") or ""
+	hudDeath.Visible = alive == false
+	deathLabel.Text = causeTitle
 end
 
-player:GetAttributeChangedSignal("MissionClock"):Connect(renderHud)
 player:GetAttributeChangedSignal("InMission"):Connect(renderHud)
+player:GetAttributeChangedSignal("MissionClock"):Connect(renderHud)
 player:GetAttributeChangedSignal("Alive"):Connect(renderHud)
-player:GetAttributeChangedSignal("CoreC"):Connect(renderHud)
-player:GetAttributeChangedSignal("AirHeld"):Connect(renderHud)
 
--- ── State sync ───────────────────────────────────────────────────────────
-
-State.OnClientEvent:Connect(function(nextState)
-	state = nextState
-	if noteHint and state.hint and state.hint ~= "" then
-		noteHint.Text = state.hint
-	end
-	if debrief.Visible or hud.Visible or planets.Visible or difficulty.Visible then
-		return
-	end
-	if workshop.Visible then
-		renderWorkshop()
-	end
-end)
-
--- ── Debrief ──────────────────────────────────────────────────────────────
+-- ── Debrief ─────────────────────────────────────────────────────────────
+local debrief = page("Debrief")
 
 DebriefEvent.OnClientEvent:Connect(function(report)
 	clear(debrief)
-	hud.Visible = false
 	show(debrief)
 
 	if report.survived then
 		label(debrief, "MISSION COMPLETE", 11, SUCCESS, FONT_TITLE)
-		label(debrief, "You survived.", 32, SUCCESS, FONT_DISPLAY)
+		label(debrief, "You survived.", 28, SUCCESS, FONT_DISPLAY)
 	else
 		label(debrief, "MISSION FAILED", 11, DANGER, FONT_TITLE)
-		label(debrief, "You died.", 32, DANGER, FONT_DISPLAY)
-	end
-
-	label(debrief, report.title, 18, TEXT_WHITE, FONT_TITLE)
-	label(debrief, report.detail, 14, TEXT_DIM)
-
-	divider(debrief)
-
-	-- NASA data section
-	label(debrief, "FROM THE NASA FACT SHEETS", 10, ACCENT, FONT_TITLE)
-	label(debrief, "The physics that decided your fate. Every number below came from NSSDC, not from a model or an estimate.", 13, TEXT_DIM)
-
-	for _, fact in report.facts do
-		local factCard = card(debrief)
-		label(factCard, fact.text, 14, TEXT_WHITE)
-		label(factCard, fact.body .. " Fact Sheet", 11, ACCENT, FONT_TITLE)
-		label(factCard, fact.sourceUrl, 10, ACCENT_DIM, FONT_MONO)
+		label(debrief, report.title, 24, TEXT_WHITE, FONT_DISPLAY)
 	end
 
 	divider(debrief)
 
-	local again = btn(debrief, "Try again (same suit)", false)
+	label(debrief, report.detail, 13, TEXT_DIM)
+
+	divider(debrief)
+
+	-- NASA fact cards
+	if report.facts then
+		label(debrief, "FROM THE NASA FACT SHEETS", 10, TEXT_FAINT, FONT_TITLE)
+		label(debrief, "The physics that decided your fate. Every number below came from NSSDC, not from a model or an estimate.", 11, ACCENT)
+
+		for _, fact in report.facts do
+			local fc = card(debrief, false)
+			label(fc, fact.text, 12, TEXT_WHITE)
+			divider(fc)
+			label(fc, fact.body .. " Fact Sheet", 10, TEXT_FAINT, FONT_TITLE)
+			label(fc, fact.sourceUrl, 10, ACCENT, FONT_MONO)
+		end
+	end
+
+	divider(debrief)
+
+	local again = btn(debrief, "Return to workshop", true)
+	again.Size = UDim2.new(1, 0, 0, 44)
 	again.MouseButton1Click:Connect(function()
-		show(difficulty)
-		renderDifficulty()
-	end)
-
-	local suit = btn(debrief, "Rebuild the suit", false)
-	suit.MouseButton1Click:Connect(function()
-		show(workshop)
-		renderWorkshop()
-	end)
-
-	local earth = btn(debrief, "Return to Earth", true)
-	earth.MouseButton1Click:Connect(function()
-		Abort:FireServer()
 		show(workshop)
 		renderWorkshop()
 	end)
 end)
 
--- ── Init ─────────────────────────────────────────────────────────────────
+-- ── State sync ──────────────────────────────────────────────────────────
+StateEvent.OnClientEvent:Connect(function(s)
+	state = s
+	if hintLabel then
+		hintLabel.Text = s.hint or ""
+	end
+	if current == workshop then
+		renderWorkshop()
+	elseif current == planets then
+		renderPlanets()
+	end
+end)
 
-show(nil)
+-- ── Init ────────────────────────────────────────────────────────────────
+local function showIntro()
+	show(intro)
+	introTitle.TextTransparency = 1
+	introSub.TextTransparency = 1
+	startBtn.Visible = false
+
+	task.delay(0.3, function()
+		TweenService:Create(introTitle, TweenInfo.new(0.8, Enum.EasingStyle.Quad), {TextTransparency = 0}):Play()
+	end)
+	task.delay(0.8, function()
+		TweenService:Create(introSub, TweenInfo.new(0.6, Enum.EasingStyle.Quad), {TextTransparency = 0}):Play()
+	end)
+	task.delay(1.5, function()
+		startBtn.Visible = true
+	end)
+end
+
+startBtn.MouseButton1Click:Connect(function()
+	show(note)
+end)
+
+print("[CODAG Client] GUI created, showing intro")
 showIntro()
-event("Ready"):FireServer()
+Ready:FireServer()
+print("[CODAG Client] Init complete")

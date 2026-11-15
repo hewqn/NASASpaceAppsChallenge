@@ -263,6 +263,7 @@ local function generateTerrain(planetId: string, center: Vector3, radius: number
 				local sx = rx + math.cos(angle) * step
 				local sz = rz + math.sin(angle) * step
 				local h = height * (1 - math.abs(step / length - 0.5) * 2)
+				if h < 1 then continue end
 				terrain:FillBlock(
 					CFrame.new(sx, center.Y + h / 2, sz),
 					Vector3.new(6, h, 6),
