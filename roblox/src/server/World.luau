@@ -561,141 +561,277 @@ local function build()
 	spawn.BottomSurface = Enum.SurfaceType.Smooth
 	spawn.Parent = earth
 
-	-- Workshop building (more substantial)
-	local shedColor = Color3.fromRGB(75, 52, 35)
-	local shedFloor = Color3.fromRGB(55, 40, 28)
+	-- ── Research outpost ─────────────────────────────────────────────────
+	local wallColor = Color3.fromRGB(180, 185, 190)  -- light grey metal
+	local wallDark = Color3.fromRGB(100, 105, 112)
+	local floorColor = Color3.fromRGB(70, 72, 75)
+	local trimColor = Color3.fromRGB(60, 130, 200)   -- blue accent trim
+	local habW, habH, habD = 22, 10, 16  -- width, height, depth
 
-	-- Floor
-	part(earth, "ShedFloor", Vector3.new(18, 0.3, 14), CFrame.new(0, 0.15, -30),
-		shedFloor, Enum.Material.WoodPlanks)
+	-- Floor (concrete pad extending beyond the walls)
+	part(earth, "HabPad", Vector3.new(habW + 8, 0.4, habD + 8), CFrame.new(0, 0.2, -30),
+		floorColor, Enum.Material.Concrete)
+	-- Interior floor
+	part(earth, "HabFloor", Vector3.new(habW, 0.15, habD), CFrame.new(0, 0.48, -30),
+		lighten(floorColor, 0.15), Enum.Material.Metal)
 
 	-- Walls
-	part(earth, "ShedWallBack", Vector3.new(18, 10, 0.6), CFrame.new(0, 5, -37),
-		shedColor, Enum.Material.Wood)
-	part(earth, "ShedWallLeft", Vector3.new(0.6, 10, 14), CFrame.new(-9, 5, -30),
-		darken(shedColor, 0.85), Enum.Material.Wood)
-	part(earth, "ShedWallRight", Vector3.new(0.6, 10, 14), CFrame.new(9, 5, -30),
-		darken(shedColor, 0.85), Enum.Material.Wood)
-	-- Front wall with door gap
-	part(earth, "ShedWallFrontL", Vector3.new(6, 10, 0.6), CFrame.new(-6, 5, -23),
-		shedColor, Enum.Material.Wood)
-	part(earth, "ShedWallFrontR", Vector3.new(6, 10, 0.6), CFrame.new(6, 5, -23),
-		shedColor, Enum.Material.Wood)
-	part(earth, "ShedWallFrontTop", Vector3.new(6, 2, 0.6), CFrame.new(0, 9, -23),
-		shedColor, Enum.Material.Wood)
+	part(earth, "HabBack", Vector3.new(habW, habH, 0.5), CFrame.new(0, habH/2 + 0.4, -30 - habD/2),
+		wallColor, Enum.Material.Metal)
+	part(earth, "HabLeft", Vector3.new(0.5, habH, habD), CFrame.new(-habW/2, habH/2 + 0.4, -30),
+		wallDark, Enum.Material.Metal)
+	part(earth, "HabRight", Vector3.new(0.5, habH, habD), CFrame.new(habW/2, habH/2 + 0.4, -30),
+		wallDark, Enum.Material.Metal)
+	-- Front wall with wide door gap
+	part(earth, "HabFrontL", Vector3.new(7, habH, 0.5), CFrame.new(-habW/2 + 3.5, habH/2 + 0.4, -30 + habD/2),
+		wallColor, Enum.Material.Metal)
+	part(earth, "HabFrontR", Vector3.new(7, habH, 0.5), CFrame.new(habW/2 - 3.5, habH/2 + 0.4, -30 + habD/2),
+		wallColor, Enum.Material.Metal)
+	part(earth, "HabFrontTop", Vector3.new(habW - 14, 2, 0.5), CFrame.new(0, habH - 0.6, -30 + habD/2),
+		wallColor, Enum.Material.Metal)
 
-	-- Roof
-	wedge(earth, "ShedRoofL", Vector3.new(18, 5, 8),
-		CFrame.new(0, 12, -26.5),
-		darken(shedColor, 0.55), Enum.Material.Slate)
-	wedge(earth, "ShedRoofR", Vector3.new(18, 5, 8),
-		CFrame.new(0, 12, -33.5) * CFrame.Angles(0, math.rad(180), 0),
-		darken(shedColor, 0.55), Enum.Material.Slate)
+	-- Blue accent trim strips along base and top
+	part(earth, "TrimBaseBack", Vector3.new(habW + 0.2, 0.3, 0.6), CFrame.new(0, 0.55, -30 - habD/2),
+		trimColor, Enum.Material.Neon)
+	part(earth, "TrimTopBack", Vector3.new(habW + 0.2, 0.3, 0.6), CFrame.new(0, habH + 0.25, -30 - habD/2),
+		trimColor, Enum.Material.Neon)
+	part(earth, "TrimBaseFront", Vector3.new(habW + 0.2, 0.3, 0.6), CFrame.new(0, 0.55, -30 + habD/2),
+		trimColor, Enum.Material.Neon)
 
-	-- Workbench inside
-	part(earth, "Workbench", Vector3.new(12, 1.2, 3), CFrame.new(0, 3.6, -35),
-		Color3.fromRGB(90, 65, 42), Enum.Material.WoodPlanks)
+	-- Flat roof
+	part(earth, "HabRoof", Vector3.new(habW + 1, 0.4, habD + 1), CFrame.new(0, habH + 0.6, -30),
+		darken(wallColor, 0.7), Enum.Material.Metal)
 
-	-- Hanging light inside workshop
-	local light = Instance.new("Part")
-	light.Name = "ShopLight"
-	light.Shape = Enum.PartType.Ball
-	light.Size = Vector3.new(1.5, 1.5, 1.5)
-	light.CFrame = CFrame.new(0, 9, -30)
-	light.Color = Color3.fromRGB(255, 220, 160)
-	light.Material = Enum.Material.Neon
-	light.Transparency = 0.1
-	light.Anchored = true
-	light.CanCollide = false
-	light.Parent = earth
-	local pointLight = Instance.new("PointLight")
-	pointLight.Color = Color3.fromRGB(255, 230, 180)
-	pointLight.Brightness = 1.5
-	pointLight.Range = 30
-	pointLight.Parent = light
+	-- Windows (transparent inset panels on side walls)
+	for wi = 1, 3 do
+		local wz = -30 - habD/2 + habD * (wi / 4)
+		local winL = part(earth, "WinL" .. wi, Vector3.new(0.3, 3, 3),
+			CFrame.new(-habW/2 + 0.1, 5.5, wz),
+			Color3.fromRGB(160, 200, 230), Enum.Material.Glass)
+		winL.Transparency = 0.5
+		local winR = part(earth, "WinR" .. wi, Vector3.new(0.3, 3, 3),
+			CFrame.new(habW/2 - 0.1, 5.5, wz),
+			Color3.fromRGB(160, 200, 230), Enum.Material.Glass)
+		winR.Transparency = 0.5
+	end
 
-	-- Trees (using terrain-style placement)
+	-- Workbench (metal this time)
+	part(earth, "Workbench", Vector3.new(14, 1, 3), CFrame.new(0, 3.5, -36),
+		Color3.fromRGB(70, 75, 80), Enum.Material.DiamondPlate)
+	-- Bench legs
+	for _, lx in { -6, -2, 2, 6 } do
+		part(earth, "BenchLeg", Vector3.new(0.4, 3, 0.4), CFrame.new(lx, 1.9, -36),
+			wallDark, Enum.Material.Metal)
+	end
+
+	-- Shelving unit on back wall
+	for si = 1, 3 do
+		part(earth, "Shelf" .. si, Vector3.new(6, 0.2, 1.5),
+			CFrame.new(-6, 2 + si * 2.2, -37.2),
+			wallDark, Enum.Material.Metal)
+	end
+
+	-- Overhead lights (strip lights along ceiling)
+	for li = 1, 3 do
+		local lz = -30 - habD/2 + habD * (li / 4)
+		local strip = part(earth, "Light" .. li, Vector3.new(habW - 4, 0.2, 1),
+			CFrame.new(0, habH - 0.1, lz),
+			Color3.fromRGB(240, 240, 255), Enum.Material.Neon)
+		strip.Transparency = 0.1
+		local pl = Instance.new("PointLight")
+		pl.Color = Color3.fromRGB(240, 240, 255)
+		pl.Brightness = 1.2
+		pl.Range = 25
+		pl.Parent = strip
+	end
+
+	-- ── Exterior details ────────────────────────────────────────────────
+	-- Satellite dish
+	local dishBase = part(earth, "DishPole", Vector3.new(0.6, 8, 0.6),
+		CFrame.new(14, 4.4, -35), wallDark, Enum.Material.Metal)
+	local dish = part(earth, "Dish", Vector3.new(5, 5, 0.5),
+		CFrame.new(14, 9, -35) * CFrame.Angles(math.rad(-30), 0, 0),
+		wallColor, Enum.Material.Metal)
+	-- Dish feed
+	part(earth, "DishFeed", Vector3.new(0.3, 2.5, 0.3),
+		CFrame.new(14, 9.5, -34) * CFrame.Angles(math.rad(-30), 0, 0),
+		wallDark, Enum.Material.Metal)
+
+	-- Solar panel rack
+	for sp = 0, 1 do
+		local spx = -14 + sp * 6
+		-- Support post
+		part(earth, "SolarPost" .. sp, Vector3.new(0.4, 3, 0.4),
+			CFrame.new(spx, 1.7, -25), wallDark, Enum.Material.Metal)
+		-- Panel (tilted toward sun)
+		part(earth, "SolarPanel" .. sp, Vector3.new(5, 0.15, 3),
+			CFrame.new(spx, 3.5, -25) * CFrame.Angles(math.rad(-20), 0, 0),
+			Color3.fromRGB(25, 35, 80), Enum.Material.Glass)
+		-- Grid lines on panel
+		part(earth, "SolarGrid" .. sp, Vector3.new(5.1, 0.05, 0.1),
+			CFrame.new(spx, 3.55, -25) * CFrame.Angles(math.rad(-20), 0, 0),
+			wallDark, Enum.Material.Metal)
+	end
+
+	-- Trees (still on Earth, but farther from the hab)
 	local treeSeeds = mulberry32(42)
-	for i = 1, 18 do
+	for i = 1, 14 do
 		local angle = treeSeeds() * math.pi * 2
-		local dist = 40 + treeSeeds() * 100
+		local dist = 50 + treeSeeds() * 100
 		local tx = math.cos(angle) * dist
 		local tz = math.sin(angle) * dist
 
-		-- Skip if too close to workshop
-		if math.abs(tx) > 20 or math.abs(tz + 30) > 25 then
+		if math.abs(tx) > 25 or math.abs(tz + 30) > 30 then
 			local trunkH = 5 + treeSeeds() * 7
 			local trunkW = 0.8 + treeSeeds() * 0.6
 			part(earth, "Trunk" .. i, Vector3.new(trunkW, trunkH, trunkW),
 				CFrame.new(tx, trunkH / 2, tz),
 				Color3.fromRGB(70 + math.floor(treeSeeds() * 20), 48, 30), Enum.Material.Wood)
-
-			-- Multi-layer foliage
 			local foliageBase = 4 + treeSeeds() * 5
-			local greenR = 45 + math.floor(treeSeeds() * 35)
-			local greenG = 95 + math.floor(treeSeeds() * 50)
-			local greenB = 35 + math.floor(treeSeeds() * 25)
 			ball(earth, "Foliage" .. i, foliageBase,
 				CFrame.new(tx, trunkH + foliageBase * 0.2, tz),
-				Color3.fromRGB(greenR, greenG, greenB), Enum.Material.LeafyGrass)
-			-- Upper canopy
-			ball(earth, "Canopy" .. i, foliageBase * 0.7,
-				CFrame.new(tx + treeSeeds() * 1.5, trunkH + foliageBase * 0.6, tz + treeSeeds() * 1.5),
-				Color3.fromRGB(greenR - 10, greenG + 10, greenB), Enum.Material.LeafyGrass)
+				Color3.fromRGB(55 + math.floor(treeSeeds() * 30), 110 + math.floor(treeSeeds() * 40), 40),
+				Enum.Material.LeafyGrass)
 		end
 	end
 
-	-- Stone path from spawn to workshop
-	local pathRng = mulberry32(999)
-	for i = 0, 14 do
-		local wobble = (pathRng() - 0.5) * 2
-		local sz = 2.5 + pathRng() * 2
-		part(earth, "Path" .. i, Vector3.new(sz, 0.15, sz),
-			CFrame.new(wobble, 0.08, 18 - i * 2.8) * CFrame.Angles(0, pathRng() * 0.3, 0),
-			Color3.fromRGB(145 + math.floor(pathRng() * 20), 135, 118), Enum.Material.Cobblestone)
+	-- Concrete walkway from spawn to hab
+	for i = 0, 12 do
+		part(earth, "Walk" .. i, Vector3.new(4, 0.12, 2.5),
+			CFrame.new(0, 0.06, 18 - i * 3.2),
+			Color3.fromRGB(135, 138, 140), Enum.Material.Concrete)
 	end
 
 	-- ── Material caches ──────────────────────────────────────────────────
-	-- Placed around the workshop, each with a glow pad
+	-- Each material gets a distinct shape matching what it actually is
 
 	local caches = {}
+
+	local function materialShape(mat, x: number, z: number): Part
+		local col = hexColor(mat.color)
+		local pile
+
+		if mat.id == "aluminum" then
+			-- Stack of flat metal sheets
+			for si = 0, 3 do
+				local sheet = part(earth, "AlSheet" .. si,
+					Vector3.new(3.5, 0.15, 2.5),
+					CFrame.new(x + (si % 2) * 0.2, 0.55 + si * 0.2, z),
+					lighten(col, si * 0.03), Enum.Material.Metal)
+				if si == 3 then pile = sheet end
+			end
+			-- Leaning sheet against the stack
+			part(earth, "AlLean", Vector3.new(3, 0.1, 2),
+				CFrame.new(x + 1.8, 1.2, z) * CFrame.Angles(0, 0, math.rad(70)),
+				col, Enum.Material.Metal)
+
+		elseif mat.id == "steel" then
+			-- I-beam lying on the ground + some scrap plates
+			-- Main beam (horizontal)
+			part(earth, "SteelBeam", Vector3.new(5, 0.5, 0.5),
+				CFrame.new(x, 0.65, z), col, Enum.Material.DiamondPlate)
+			-- Flanges
+			part(earth, "SteelFlangeT", Vector3.new(5, 0.15, 1.5),
+				CFrame.new(x, 0.95, z), col, Enum.Material.DiamondPlate)
+			part(earth, "SteelFlangeB", Vector3.new(5, 0.15, 1.5),
+				CFrame.new(x, 0.5, z), col, Enum.Material.DiamondPlate)
+			-- Scrap plate leaning against beam
+			pile = part(earth, mat.id, Vector3.new(2, 2, 0.2),
+				CFrame.new(x - 0.5, 1.4, z + 1.2) * CFrame.Angles(0, math.rad(15), math.rad(-15)),
+				darken(col, 0.8), Enum.Material.DiamondPlate)
+
+		elseif mat.id == "aerogel" then
+			-- Translucent slab, almost ghostly
+			pile = part(earth, mat.id, Vector3.new(3, 2, 2.5),
+				CFrame.new(x, 1.4, z), col, Enum.Material.Glass)
+			pile.Transparency = 0.4
+			-- Inner glow
+			local glow = Instance.new("PointLight")
+			glow.Color = col
+			glow.Brightness = 0.5
+			glow.Range = 8
+			glow.Parent = pile
+
+		elseif mat.id == "wool" then
+			-- Rolled-up batting (cylinder on its side)
+			pile = Instance.new("Part")
+			pile.Name = mat.id
+			pile.Shape = Enum.PartType.Cylinder
+			pile.Size = Vector3.new(3, 2.5, 2.5)
+			pile.CFrame = CFrame.new(x, 1.65, z) * CFrame.Angles(0, math.rad(30), math.rad(90))
+			pile.Color = col
+			pile.Material = Enum.Material.Fabric
+			pile.Anchored = true
+			pile.Parent = earth
+			-- Second smaller roll next to it
+			local roll2 = Instance.new("Part")
+			roll2.Name = "WoolRoll2"
+			roll2.Shape = Enum.PartType.Cylinder
+			roll2.Size = Vector3.new(2, 1.8, 1.8)
+			roll2.CFrame = CFrame.new(x + 1.5, 1.3, z + 0.8) * CFrame.Angles(0, math.rad(-20), math.rad(90))
+			roll2.Color = lighten(col, 0.1)
+			roll2.Material = Enum.Material.Fabric
+			roll2.Anchored = true
+			roll2.Parent = earth
+
+		elseif mat.id == "oxygen" then
+			-- Cluster of gas cylinders standing upright
+			pile = Instance.new("Part")
+			pile.Name = mat.id
+			pile.Shape = Enum.PartType.Cylinder
+			pile.Size = Vector3.new(4, 1.2, 1.2)
+			pile.CFrame = CFrame.new(x, 2.4, z) * CFrame.Angles(0, 0, 0)
+			pile.Color = col
+			pile.Material = Enum.Material.Metal
+			pile.Anchored = true
+			pile.Parent = earth
+			-- Valve cap on top
+			local cap = Instance.new("Part")
+			cap.Name = "O2Cap"
+			cap.Shape = Enum.PartType.Cylinder
+			cap.Size = Vector3.new(0.6, 1.4, 1.4)
+			cap.CFrame = CFrame.new(x, 4.7, z)
+			cap.Color = darken(col, 0.6)
+			cap.Material = Enum.Material.Metal
+			cap.Anchored = true
+			cap.Parent = earth
+			-- Second cylinder leaning
+			local tank2 = Instance.new("Part")
+			tank2.Name = "O2Tank2"
+			tank2.Shape = Enum.PartType.Cylinder
+			tank2.Size = Vector3.new(3.5, 1, 1)
+			tank2.CFrame = CFrame.new(x + 1.2, 2, z + 0.5) * CFrame.Angles(0, math.rad(20), math.rad(15))
+			tank2.Color = lighten(col, 0.1)
+			tank2.Material = Enum.Material.Metal
+			tank2.Anchored = true
+			tank2.Parent = earth
+
+		else
+			-- Fallback: labeled crate
+			pile = part(earth, mat.id, Vector3.new(3, 3, 3),
+				CFrame.new(x, 1.9, z), col, Enum.Material.Metal)
+		end
+
+		return pile
+	end
+
 	for _, material in Catalog.MATERIALS do
 		local x = material.position[1] * 10
 		local z = material.position[3] * 10
 
-		-- Glowing pad
-		local basePad = part(earth, material.id .. "Pad", Vector3.new(5, 0.15, 5),
-			CFrame.new(x, 0.08, z),
+		-- Small glowing pad under each cache
+		local basePad = part(earth, material.id .. "Pad", Vector3.new(5, 0.1, 5),
+			CFrame.new(x, 0.05, z),
 			hexColor(material.color), Enum.Material.Neon)
-		basePad.Transparency = 0.5
+		basePad.Transparency = 0.6
 
-		-- The cache with appropriate shape
-		local pile
-		if material.structural then
-			pile = part(earth, material.id, Vector3.new(3.5, 3.5, 3.5),
-				CFrame.new(x, 2, z) * CFrame.Angles(0, math.rad(45), 0),
-				hexColor(material.color), Enum.Material.DiamondPlate)
-		elseif material.id == "oxygen" then
-			pile = Instance.new("Part")
-			pile.Name = material.id
-			pile.Shape = Enum.PartType.Cylinder
-			pile.Size = Vector3.new(4.5, 2, 2)
-			pile.CFrame = CFrame.new(x, 1.5, z) * CFrame.Angles(0, 0, math.rad(90))
-			pile.Color = hexColor(material.color)
-			pile.Material = Enum.Material.Metal
-			pile.Anchored = true
-			pile.Parent = earth
-		else
-			pile = ball(earth, material.id, 3.5, CFrame.new(x, 2, z),
-				hexColor(material.color), Enum.Material.Fabric)
-		end
+		local pile = materialShape(material, x, z)
 		if pile.Parent == nil then
 			pile.Parent = earth
 		end
 		pile:SetAttribute("MaterialId", material.id)
 		pile.CastShadow = true
 
-		-- Proximity prompt (no floating billboard labels)
 		local use = prompt(pile, "Pick up", material.name)
 		caches[material.id] = { part = pile, prompt = use }
 	end
