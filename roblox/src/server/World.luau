@@ -1134,10 +1134,17 @@ local function build()
 			-- Generate real terrain
 			generateTerrain(planet.id, center, planetRadius, index * 137)
 
-			-- Landing pad (small, embedded in terrain)
+			-- Clear terrain around landing zone so player doesn't spawn inside rock
+			terrain:FillBlock(
+				CFrame.new(cx, 15, cz),
+				Vector3.new(20, 40, 20),
+				Enum.Material.Air
+			)
+
+			-- Landing pad raised above terrain
 			local pad = part(destinations, planet.id .. "Pad",
-				Vector3.new(8, 0.3, 8),
-				CFrame.new(cx, 0.15, cz),
+				Vector3.new(10, 0.5, 10),
+				CFrame.new(cx, 2, cz),
 				lighten(look.ground, 0.2), Enum.Material.Metal)
 			pad:SetAttribute("PlanetId", planet.id)
 			pad.CastShadow = false

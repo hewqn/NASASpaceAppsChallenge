@@ -53,6 +53,7 @@ The game also doesn't simplify the planets. Venus really does have 92 bars of su
 - **TypeScript + Vite**: Data pipeline for exporting planet/material JSON to Roblox-compatible Luau modules
 - **Node.js**: Build tooling and data export scripts
 - **Claude AI (Anthropic)**: Used for code generation, debugging, and procedural environment design (space station, material shapes, terrain generation). All AI-generated code was reviewed and integrated by the team.
+- **Sketchfab**: Planet textures sourced from Sketchfab (Creative Commons licensed models).
 
 ## NASA Data Used
 

@@ -260,13 +260,9 @@ end
 
 local current = nil
 local function show(target)
-	warn("[CODAG Client] show() called, current =", current and current.Name or "nil", "target =", target and target.Name or "nil")
 	if current then current.Visible = false end
 	if target then target.Visible = true end
 	current = target
-	if target then
-		warn("[CODAG Client] show() target Visible =", target.Visible, "Parent =", target.Parent and target.Parent.Name or "nil", "Size =", tostring(target.Size), "Position =", tostring(target.Position))
-	end
 end
 
 -- ── Intro ───────────────────────────────────────────────────────────────
@@ -603,7 +599,6 @@ function renderWorkshop()
 	local toPlanets = btn(workshop, "Choose destination", true)
 	toPlanets.Size = UDim2.new(1, 0, 0, 44)
 	toPlanets.MouseButton1Click:Connect(function()
-		warn("[CODAG Client] Choose destination clicked, state =", state ~= nil)
 		show(planets)
 		renderPlanets()
 	end)
@@ -640,16 +635,13 @@ local function isOpen(planetId: string): boolean
 end
 
 function renderPlanets()
-	warn("[CODAG Client] renderPlanets called, state =", state ~= nil)
 	clear(planets)
 
 	if state == nil then
-		warn("[CODAG Client] renderPlanets: state is nil, aborting")
 		return
 	end
 
 	local design = designFrom(state.design)
-	warn("[CODAG Client] renderPlanets: design layers =", #design.layers, "planets =", #Sources.DESTINATION_ORDER)
 	local check = 1.5
 
 	label(planets, "DESTINATIONS", 11, ACCENT, FONT_TITLE)
@@ -703,15 +695,9 @@ function renderPlanets()
 			label(planetCard, string.format("Gravity: %.2f m/s2  |  %s", planet.gravityMs2, planet.role), 11, ACCENT, FONT_MONO)
 
 			local hotOk, hotResult = pcall(Survival.kidResult, design, planet, check, "hot")
-			if not hotOk then
-				warn("[CODAG Client] kidResult HOT error for", planetId, ":", hotResult)
-				hotResult = "Hot side: error"
-			end
+			if not hotOk then hotResult = "Hot side: error" end
 			local coldOk, coldResult = pcall(Survival.kidResult, design, planet, check, "cold")
-			if not coldOk then
-				warn("[CODAG Client] kidResult COLD error for", planetId, ":", coldResult)
-				coldResult = "Cold side: error"
-			end
+			if not coldOk then coldResult = "Cold side: error" end
 			label(planetCard, hotResult, 10, TEXT_DIM, FONT_MONO)
 			label(planetCard, coldResult, 10, TEXT_DIM, FONT_MONO)
 
@@ -728,7 +714,6 @@ function renderPlanets()
 		end
 	end
 
-	warn("[CODAG Client] renderPlanets: finished rendering all planets")
 	divider(planets)
 
 	local back = btn(planets, "Back to workshop", false)
