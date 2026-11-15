@@ -332,12 +332,16 @@ local function depart(player: Player, planetId: string, difficultyId: string, si
 		sendState(player)
 		return
 	end
-	local problem = Design.stockProblem(session.design, session.inventory)
-	if problem ~= nil then
-		session.problem = problem
-		session.hint = problem
-		sendState(player)
-		return
+	if not DEMO_MODE then
+		local problem = Design.stockProblem(session.design, session.inventory)
+		if problem ~= nil then
+			session.problem = problem
+			session.hint = problem
+			sendState(player)
+			return
+		end
+	else
+		warn("[CODAG Server] DEMO_MODE: skipping stockProblem check")
 	end
 	local profile = Catalog.difficultyById(difficultyId)
 	local planet = Catalog.planetById(planetId)
@@ -449,8 +453,10 @@ end
 
 -- Add a layer to the suit
 AddLayer.OnServerEvent:Connect(function(player, materialId, thicknessId)
+	warn("[CODAG Server] AddLayer received:", materialId, thicknessId)
 	local session = sessions[player]
 	if session == nil or typeof(materialId) ~= "string" or typeof(thicknessId) ~= "string" then
+		warn("[CODAG Server] AddLayer: bad session or types")
 		return
 	end
 	if materialId == "oxygen" then
@@ -494,8 +500,10 @@ end)
 
 -- Remove a layer by index
 RemoveLayer.OnServerEvent:Connect(function(player, layerIndex)
+	warn("[CODAG Server] RemoveLayer received:", layerIndex)
 	local session = sessions[player]
 	if session == nil or typeof(layerIndex) ~= "number" then
+		warn("[CODAG Server] RemoveLayer: bad session or type")
 		return
 	end
 	layerIndex = math.floor(layerIndex)
