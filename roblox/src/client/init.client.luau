@@ -619,6 +619,7 @@ end)
 -- ── Planets ─────────────────────────────────────────────────────────────
 planets = page("Planets", true)
 
+local difficulty -- forward declaration; assigned after renderPlanets
 local DEMO_MODE = true
 
 local function isOpen(planetId: string): boolean
@@ -738,7 +739,7 @@ function renderPlanets()
 end
 
 -- ── Difficulty / Briefing ───────────────────────────────────────────────
-local difficulty = page("Difficulty", true)
+difficulty = page("Difficulty", true)
 
 function renderDifficulty()
 	clear(difficulty)
