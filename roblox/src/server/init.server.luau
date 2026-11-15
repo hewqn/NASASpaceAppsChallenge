@@ -490,7 +490,7 @@ AddLayer.OnServerEvent:Connect(function(player, materialId, thicknessId)
 		materialId = materialId,
 		thicknessM = thickness,
 	})
-	Design.syncLegacy(session.design)
+	if Design.syncLegacy then Design.syncLegacy(session.design) end
 	local mat = Catalog.materialById(materialId)
 	session.hint = "Added " .. mat.name .. " layer."
 	session.problem = Design.stockProblem(session.design, session.inventory)
@@ -511,7 +511,7 @@ RemoveLayer.OnServerEvent:Connect(function(player, layerIndex)
 		return
 	end
 	table.remove(session.design.layers, layerIndex)
-	Design.syncLegacy(session.design)
+	if Design.syncLegacy then Design.syncLegacy(session.design) end
 	session.hint = "Removed layer."
 	session.problem = Design.stockProblem(session.design, session.inventory)
 	wear(player)
