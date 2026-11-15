@@ -796,9 +796,11 @@ function renderDifficulty()
 
 		local diffId = profile.id
 		hotBtn.MouseButton1Click:Connect(function()
+			warn("[CODAG Client] Firing Depart:", chosenPlanet, diffId, "hot")
 			DepartEvent:FireServer(chosenPlanet, diffId, "hot")
 		end)
 		coldBtn.MouseButton1Click:Connect(function()
+			warn("[CODAG Client] Firing Depart:", chosenPlanet, diffId, "cold")
 			DepartEvent:FireServer(chosenPlanet, diffId, "cold")
 		end)
 	end

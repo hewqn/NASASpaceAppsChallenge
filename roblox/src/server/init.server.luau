@@ -17,7 +17,9 @@ local World = require(script.World)
 
 Catalog.assertFactSheetRecords(Catalog.PLANETS)
 
+warn("[CODAG Server] Script starting")
 local world = World.build()
+warn("[CODAG Server] World built")
 local earthG = Catalog.planetById("earth").gravityMs2
 local TIME_SCALE = 30
 
@@ -31,8 +33,10 @@ local function remote(name: string): RemoteEvent
 	-- Reuse existing event so client references survive server restart (Rojo sync)
 	local existing = folder:FindFirstChild(name)
 	if existing and existing:IsA("RemoteEvent") then
+		warn("[CODAG Server] Reusing event:", name)
 		return existing
 	end
+	warn("[CODAG Server] Creating event:", name)
 	local event = Instance.new("RemoteEvent")
 	event.Name = name
 	event.Parent = folder
@@ -518,9 +522,13 @@ SetOxygen.OnServerEvent:Connect(function(player, kg)
 end)
 
 Depart.OnServerEvent:Connect(function(player, planetId, difficultyId, side)
+	warn("[CODAG Server] Depart event received:", planetId, difficultyId, side)
 	if typeof(planetId) ~= "string" or typeof(difficultyId) ~= "string" or typeof(side) ~= "string" then
+		warn("[CODAG Server] Depart: bad types")
 		return
 	end
+	local session = sessions[player]
+	warn("[CODAG Server] Depart: session exists =", session ~= nil, "mission =", session and session.mission ~= nil)
 	depart(player, planetId, difficultyId, side)
 end)
 
