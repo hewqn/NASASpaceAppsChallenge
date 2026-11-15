@@ -17,7 +17,6 @@ In Studio, connect the plugin. Press Play. Walk to a colored pile, pick it up, a
 
 The browser experiment in the repo root still runs with `npm install`, `npm test`, and `npm run dev`. The Roblox place is the game.
 
-## NASA data this build uses
 
 ## NASA data this build uses
 
