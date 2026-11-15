@@ -68,8 +68,8 @@ local function applyLook(planetId: string)
 	Lighting.Ambient = look.sky
 	Lighting.OutdoorAmbient = look.sky
 	Lighting.FogColor = look.sky
-	Lighting.FogStart = if planetId == "earth" then 400 else 40
-	Lighting.FogEnd = if planetId == "earth" then 900 else 180
+	Lighting.FogStart = if planetId == "earth" then 9999 else 40
+	Lighting.FogEnd = if planetId == "earth" then 10000 else 180
 
 	local atmoConfig = world.atmo[planetId] or world.atmo.earth
 	local atmoInst = world.atmoInstance

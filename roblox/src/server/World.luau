@@ -7,7 +7,7 @@ local Catalog = require(ReplicatedStorage:WaitForChild("CODAG").Data.Catalog)
 -- Colors derived from NASA imagery and real surface observations
 
 local LOOK = {
-	earth   = { ground = Color3.fromRGB(111, 143,  98), sky = Color3.fromRGB(135, 175, 210), clock = 14 },
+	earth   = { ground = Color3.fromRGB(111, 143,  98), sky = Color3.fromRGB( 30,  40,  60), clock = 0 },
 	moon    = { ground = Color3.fromRGB(160, 155, 148), sky = Color3.fromRGB(  4,   4,   8), clock = 14 },
 	mercury = { ground = Color3.fromRGB(140, 130, 118), sky = Color3.fromRGB( 10,   8,   6), clock = 14 },
 	venus   = { ground = Color3.fromRGB(180, 130,  60), sky = Color3.fromRGB(160, 110,  40), clock = 12 },
@@ -21,7 +21,7 @@ local LOOK = {
 -- Per-planet Atmosphere config from NASA observations
 -- density/offset/haze scaled to approximate real conditions
 local ATMO = {
-	earth   = { density = 0.35, offset = 0.25, haze = 1.8, glare = 0.6,  color = Color3.fromRGB(170, 196, 220), decay = Color3.fromRGB(105, 135, 180) },
+	earth   = { density = 0.05, offset = 0,    haze = 0,   glare = 0,    color = Color3.fromRGB( 20,  25,  40), decay = Color3.fromRGB( 10,  15,  30) },
 	moon    = { density = 0,    offset = 0,    haze = 0,   glare = 0,    color = Color3.fromRGB(0, 0, 0),       decay = Color3.fromRGB(0, 0, 0) },
 	mercury = { density = 0,    offset = 0,    haze = 0,   glare = 0.1,  color = Color3.fromRGB(20, 15, 10),    decay = Color3.fromRGB(10, 8, 5) },
 	venus   = { density = 0.85, offset = 0.7,  haze = 2.8, glare = 1.0,  color = Color3.fromRGB(200, 155, 60), decay = Color3.fromRGB(170, 120, 40) },
