@@ -535,10 +535,10 @@ local function build()
 	-- Generate terrain
 	generateTerrain("earth", earthCenter, earthRadius, 42)
 
-	-- Clear a flat area around spawn and workshop
+	-- Clear a flat area around spawn and station
 	local clearRegion = Region3.new(
 		Vector3.new(-50, -5, -50),
-		Vector3.new(50, 15, 50)
+		Vector3.new(50, 40, 50)
 	):ExpandToGrid(4)
 	terrain:FillRegion(clearRegion, 4, Enum.Material.Air)
 	-- Re-fill ground in cleared area
@@ -561,119 +561,156 @@ local function build()
 	spawn.BottomSurface = Enum.SurfaceType.Smooth
 	spawn.Parent = earth
 
-	-- ── Research outpost ─────────────────────────────────────────────────
-	local wallColor = Color3.fromRGB(180, 185, 190)  -- light grey metal
-	local wallDark = Color3.fromRGB(100, 105, 112)
-	local floorColor = Color3.fromRGB(70, 72, 75)
-	local trimColor = Color3.fromRGB(60, 130, 200)   -- blue accent trim
-	local habW, habH, habD = 22, 10, 16  -- width, height, depth
+	-- ── Space station hub ────────────────────────────────────────────────
+	local hull     = Color3.fromRGB(235, 238, 242)  -- bright white
+	local hullAlt  = Color3.fromRGB(200, 205, 212)  -- panel grey
+	local floorCol = Color3.fromRGB(90, 95, 100)
+	local accent   = Color3.fromRGB(40, 140, 255)   -- NASA blue
+	local warn     = Color3.fromRGB(255, 140, 40)   -- caution orange
+	local SP = Enum.Material.SmoothPlastic           -- renders bright
+	local habZ = -20  -- center of the station
 
-	-- Floor (concrete pad extending beyond the walls)
-	part(earth, "HabPad", Vector3.new(habW + 8, 0.4, habD + 8), CFrame.new(0, 0.2, -30),
-		floorColor, Enum.Material.Concrete)
-	-- Interior floor
-	part(earth, "HabFloor", Vector3.new(habW, 0.15, habD), CFrame.new(0, 0.48, -30),
-		lighten(floorColor, 0.15), Enum.Material.Metal)
+	-- Landing pad (dark disc under the station)
+	local pad = Instance.new("Part")
+	pad.Name = "LandingPad"
+	pad.Shape = Enum.PartType.Cylinder
+	pad.Size = Vector3.new(0.25, 22, 22)
+	pad.CFrame = CFrame.new(0, 0.13, habZ) * CFrame.Angles(0, 0, math.rad(90))
+	pad.Color = Color3.fromRGB(50, 55, 62)
+	pad.Material = SP
+	pad.Anchored = true
+	pad.Parent = earth
+	-- Glow ring around pad edge
+	local ring = Instance.new("Part")
+	ring.Name = "PadRing"
+	ring.Shape = Enum.PartType.Cylinder
+	ring.Size = Vector3.new(0.08, 23, 23)
+	ring.CFrame = CFrame.new(0, 0.04, habZ) * CFrame.Angles(0, 0, math.rad(90))
+	ring.Color = accent
+	ring.Material = Enum.Material.Neon
+	ring.Transparency = 0.3
+	ring.Anchored = true
+	ring.Parent = earth
 
-	-- Walls
-	part(earth, "HabBack", Vector3.new(habW, habH, 0.5), CFrame.new(0, habH/2 + 0.4, -30 - habD/2),
-		wallColor, Enum.Material.Metal)
-	part(earth, "HabLeft", Vector3.new(0.5, habH, habD), CFrame.new(-habW/2, habH/2 + 0.4, -30),
-		wallDark, Enum.Material.Metal)
-	part(earth, "HabRight", Vector3.new(0.5, habH, habD), CFrame.new(habW/2, habH/2 + 0.4, -30),
-		wallDark, Enum.Material.Metal)
-	-- Front wall with wide door gap
-	part(earth, "HabFrontL", Vector3.new(7, habH, 0.5), CFrame.new(-habW/2 + 3.5, habH/2 + 0.4, -30 + habD/2),
-		wallColor, Enum.Material.Metal)
-	part(earth, "HabFrontR", Vector3.new(7, habH, 0.5), CFrame.new(habW/2 - 3.5, habH/2 + 0.4, -30 + habD/2),
-		wallColor, Enum.Material.Metal)
-	part(earth, "HabFrontTop", Vector3.new(habW - 14, 2, 0.5), CFrame.new(0, habH - 0.6, -30 + habD/2),
-		wallColor, Enum.Material.Metal)
+	-- ── Hull (ground level, walkable interior) ──────────────────────────
+	local W, H, D = 14, 8, 12
+	local by = 0.4  -- base Y
 
-	-- Blue accent trim strips along base and top
-	part(earth, "TrimBaseBack", Vector3.new(habW + 0.2, 0.3, 0.6), CFrame.new(0, 0.55, -30 - habD/2),
-		trimColor, Enum.Material.Neon)
-	part(earth, "TrimTopBack", Vector3.new(habW + 0.2, 0.3, 0.6), CFrame.new(0, habH + 0.25, -30 - habD/2),
-		trimColor, Enum.Material.Neon)
-	part(earth, "TrimBaseFront", Vector3.new(habW + 0.2, 0.3, 0.6), CFrame.new(0, 0.55, -30 + habD/2),
-		trimColor, Enum.Material.Neon)
+	-- Floor
+	part(earth, "HullFloor", Vector3.new(W, 0.3, D),
+		CFrame.new(0, by, habZ), floorCol, SP)
 
-	-- Flat roof
-	part(earth, "HabRoof", Vector3.new(habW + 1, 0.4, habD + 1), CFrame.new(0, habH + 0.6, -30),
-		darken(wallColor, 0.7), Enum.Material.Metal)
+	-- Back wall
+	part(earth, "HullBack", Vector3.new(W, H, 0.4),
+		CFrame.new(0, by + H/2, habZ - D/2), hull, SP)
+	-- Side walls
+	part(earth, "HullLeft", Vector3.new(0.4, H, D),
+		CFrame.new(-W/2, by + H/2, habZ), hull, SP)
+	part(earth, "HullRight", Vector3.new(0.4, H, D),
+		CFrame.new(W/2, by + H/2, habZ), hull, SP)
 
-	-- Windows (transparent inset panels on side walls)
-	for wi = 1, 3 do
-		local wz = -30 - habD/2 + habD * (wi / 4)
-		local winL = part(earth, "WinL" .. wi, Vector3.new(0.3, 3, 3),
-			CFrame.new(-habW/2 + 0.1, 5.5, wz),
-			Color3.fromRGB(160, 200, 230), Enum.Material.Glass)
-		winL.Transparency = 0.5
-		local winR = part(earth, "WinR" .. wi, Vector3.new(0.3, 3, 3),
-			CFrame.new(habW/2 - 0.1, 5.5, wz),
-			Color3.fromRGB(160, 200, 230), Enum.Material.Glass)
-		winR.Transparency = 0.5
+	-- Front wall (open doorway in center)
+	part(earth, "HullFrontL", Vector3.new(3.5, H, 0.4),
+		CFrame.new(-W/2 + 1.75, by + H/2, habZ + D/2), hull, SP)
+	part(earth, "HullFrontR", Vector3.new(3.5, H, 0.4),
+		CFrame.new(W/2 - 1.75, by + H/2, habZ + D/2), hull, SP)
+	part(earth, "DoorLintel", Vector3.new(W - 7, 1.5, 0.4),
+		CFrame.new(0, by + H - 0.75, habZ + D/2), hull, SP)
+
+	-- Roof
+	part(earth, "HullRoof", Vector3.new(W + 0.6, 0.35, D + 0.6),
+		CFrame.new(0, by + H + 0.17, habZ), hullAlt, SP)
+
+	-- ── Neon accent lines ───────────────────────────────────────────────
+	-- Horizontal blue band around the hull at ~40% height
+	local bandY = by + H * 0.4
+	part(earth, "BandBack", Vector3.new(W + 0.3, 0.2, 0.45),
+		CFrame.new(0, bandY, habZ - D/2), accent, Enum.Material.Neon)
+	part(earth, "BandLeft", Vector3.new(0.45, 0.2, D + 0.3),
+		CFrame.new(-W/2, bandY, habZ), accent, Enum.Material.Neon)
+	part(earth, "BandRight", Vector3.new(0.45, 0.2, D + 0.3),
+		CFrame.new(W/2, bandY, habZ), accent, Enum.Material.Neon)
+	-- Door frame glow
+	part(earth, "DoorGlowL", Vector3.new(0.12, H, 0.45),
+		CFrame.new(-W/2 + 3.5, by + H/2, habZ + D/2), accent, Enum.Material.Neon)
+	part(earth, "DoorGlowR", Vector3.new(0.12, H, 0.45),
+		CFrame.new(W/2 - 3.5, by + H/2, habZ + D/2), accent, Enum.Material.Neon)
+	-- Caution stripe at threshold
+	part(earth, "Caution", Vector3.new(W - 7, 0.05, 0.6),
+		CFrame.new(0, by + 0.18, habZ + D/2), warn, Enum.Material.Neon)
+
+	-- ── Glass viewports ─────────────────────────────────────────────────
+	local glassCol = Color3.fromRGB(100, 180, 240)
+	-- Front viewport above door
+	local vp = part(earth, "Viewport", Vector3.new(W - 7, 2, 0.25),
+		CFrame.new(0, by + H - 2.5, habZ + D/2), glassCol, Enum.Material.Glass)
+	vp.Transparency = 0.35
+	-- Side portholes
+	for wi = 1, 2 do
+		local wz = habZ - D/4 + (wi - 1) * D/2
+		local pL = part(earth, "PortL" .. wi, Vector3.new(0.25, 2.5, 2.5),
+			CFrame.new(-W/2 + 0.1, by + H * 0.55, wz), glassCol, Enum.Material.Glass)
+		pL.Transparency = 0.35
+		local pR = part(earth, "PortR" .. wi, Vector3.new(0.25, 2.5, 2.5),
+			CFrame.new(W/2 - 0.1, by + H * 0.55, wz), glassCol, Enum.Material.Glass)
+		pR.Transparency = 0.35
 	end
 
-	-- Workbench (metal this time)
-	part(earth, "Workbench", Vector3.new(14, 1, 3), CFrame.new(0, 3.5, -36),
-		Color3.fromRGB(70, 75, 80), Enum.Material.DiamondPlate)
-	-- Bench legs
-	for _, lx in { -6, -2, 2, 6 } do
-		part(earth, "BenchLeg", Vector3.new(0.4, 3, 0.4), CFrame.new(lx, 1.9, -36),
-			wallDark, Enum.Material.Metal)
+	-- ── Solar panel wings ───────────────────────────────────────────────
+	for _, side in { -1, 1 } do
+		local sx = side * (W/2 + 6)
+		-- Support arm
+		part(earth, "SolarArm" .. side, Vector3.new(8, 0.25, 0.25),
+			CFrame.new(side * (W/2 + 4), by + H * 0.55, habZ), hullAlt, SP)
+		-- Panel
+		part(earth, "SolarWing" .. side, Vector3.new(6, 0.08, 8),
+			CFrame.new(sx, by + H * 0.55, habZ),
+			Color3.fromRGB(30, 50, 100), SP)
+		-- Grid line
+		part(earth, "SolarLine" .. side, Vector3.new(6.05, 0.04, 0.08),
+			CFrame.new(sx, by + H * 0.55 + 0.05, habZ),
+			Color3.fromRGB(60, 85, 150), SP)
 	end
 
-	-- Shelving unit on back wall
-	for si = 1, 3 do
-		part(earth, "Shelf" .. si, Vector3.new(6, 0.2, 1.5),
-			CFrame.new(-6, 2 + si * 2.2, -37.2),
-			wallDark, Enum.Material.Metal)
+	-- ── Antenna + beacon ────────────────────────────────────────────────
+	part(earth, "AntPole", Vector3.new(0.25, 4, 0.25),
+		CFrame.new(0, by + H + 2.2, habZ - 3), hullAlt, SP)
+	part(earth, "AntCross", Vector3.new(3, 0.12, 0.12),
+		CFrame.new(0, by + H + 4.2, habZ - 3), accent, Enum.Material.Neon)
+	local blink = part(earth, "AntLight", Vector3.new(0.4, 0.4, 0.4),
+		CFrame.new(0, by + H + 4.5, habZ - 3),
+		Color3.fromRGB(255, 50, 50), Enum.Material.Neon)
+	local bl = Instance.new("PointLight")
+	bl.Color = Color3.fromRGB(255, 50, 50)
+	bl.Brightness = 2
+	bl.Range = 15
+	bl.Parent = blink
+
+	-- ── Interior furnishing ─────────────────────────────────────────────
+	-- Workbench along back wall
+	part(earth, "Workbench", Vector3.new(10, 0.5, 2.5),
+		CFrame.new(0, by + 2, habZ - D/2 + 2), Color3.fromRGB(65, 70, 75), SP)
+	for _, lx in { -4, -1, 2, 5 } do
+		part(earth, "BenchLeg" .. lx, Vector3.new(0.25, 1.6, 0.25),
+			CFrame.new(lx, by + 1.1, habZ - D/2 + 2), hullAlt, SP)
 	end
 
-	-- Overhead lights (strip lights along ceiling)
-	for li = 1, 3 do
-		local lz = -30 - habD/2 + habD * (li / 4)
-		local strip = part(earth, "Light" .. li, Vector3.new(habW - 4, 0.2, 1),
-			CFrame.new(0, habH - 0.1, lz),
-			Color3.fromRGB(240, 240, 255), Enum.Material.Neon)
+	-- Ceiling strip lights
+	for li = 1, 2 do
+		local lz = habZ - D/4 + (li - 1) * D/2
+		local strip = part(earth, "CLight" .. li, Vector3.new(W - 3, 0.12, 0.7),
+			CFrame.new(0, by + H - 0.25, lz),
+			Color3.fromRGB(220, 230, 255), Enum.Material.Neon)
 		strip.Transparency = 0.1
 		local pl = Instance.new("PointLight")
-		pl.Color = Color3.fromRGB(240, 240, 255)
-		pl.Brightness = 1.2
-		pl.Range = 25
+		pl.Color = Color3.fromRGB(220, 230, 255)
+		pl.Brightness = 1.5
+		pl.Range = 20
 		pl.Parent = strip
 	end
 
-	-- ── Exterior details ────────────────────────────────────────────────
-	-- Satellite dish
-	local dishBase = part(earth, "DishPole", Vector3.new(0.6, 8, 0.6),
-		CFrame.new(14, 4.4, -35), wallDark, Enum.Material.Metal)
-	local dish = part(earth, "Dish", Vector3.new(5, 5, 0.5),
-		CFrame.new(14, 9, -35) * CFrame.Angles(math.rad(-30), 0, 0),
-		wallColor, Enum.Material.Metal)
-	-- Dish feed
-	part(earth, "DishFeed", Vector3.new(0.3, 2.5, 0.3),
-		CFrame.new(14, 9.5, -34) * CFrame.Angles(math.rad(-30), 0, 0),
-		wallDark, Enum.Material.Metal)
-
-	-- Solar panel rack
-	for sp = 0, 1 do
-		local spx = -14 + sp * 6
-		-- Support post
-		part(earth, "SolarPost" .. sp, Vector3.new(0.4, 3, 0.4),
-			CFrame.new(spx, 1.7, -25), wallDark, Enum.Material.Metal)
-		-- Panel (tilted toward sun)
-		part(earth, "SolarPanel" .. sp, Vector3.new(5, 0.15, 3),
-			CFrame.new(spx, 3.5, -25) * CFrame.Angles(math.rad(-20), 0, 0),
-			Color3.fromRGB(25, 35, 80), Enum.Material.Glass)
-		-- Grid lines on panel
-		part(earth, "SolarGrid" .. sp, Vector3.new(5.1, 0.05, 0.1),
-			CFrame.new(spx, 3.55, -25) * CFrame.Angles(math.rad(-20), 0, 0),
-			wallDark, Enum.Material.Metal)
-	end
-
-	-- Trees (still on Earth, but farther from the hab)
+	-- ── Exterior ────────────────────────────────────────────────────────
+	-- Trees
 	local treeSeeds = mulberry32(42)
 	for i = 1, 14 do
 		local angle = treeSeeds() * math.pi * 2
@@ -681,7 +718,7 @@ local function build()
 		local tx = math.cos(angle) * dist
 		local tz = math.sin(angle) * dist
 
-		if math.abs(tx) > 25 or math.abs(tz + 30) > 30 then
+		if math.abs(tx) > 25 or math.abs(tz + 20) > 25 then
 			local trunkH = 5 + treeSeeds() * 7
 			local trunkW = 0.8 + treeSeeds() * 0.6
 			part(earth, "Trunk" .. i, Vector3.new(trunkW, trunkH, trunkW),
@@ -695,11 +732,18 @@ local function build()
 		end
 	end
 
-	-- Concrete walkway from spawn to hab
-	for i = 0, 12 do
-		part(earth, "Walk" .. i, Vector3.new(4, 0.12, 2.5),
-			CFrame.new(0, 0.06, 18 - i * 3.2),
-			Color3.fromRGB(135, 138, 140), Enum.Material.Concrete)
+	-- Lit walkway from spawn to station
+	for i = 0, 8 do
+		local wz = 18 - i * 4.5
+		part(earth, "Walk" .. i, Vector3.new(4, 0.1, 2.8),
+			CFrame.new(0, 0.05, wz), Color3.fromRGB(55, 60, 65), SP)
+		-- Edge lights every other slab
+		if i % 2 == 0 then
+			part(earth, "WalkLight" .. i, Vector3.new(0.15, 0.15, 2.8),
+				CFrame.new(-2.1, 0.12, wz), accent, Enum.Material.Neon)
+			part(earth, "WalkLightR" .. i, Vector3.new(0.15, 0.15, 2.8),
+				CFrame.new(2.1, 0.12, wz), accent, Enum.Material.Neon)
+		end
 	end
 
 	-- ── Material caches ──────────────────────────────────────────────────
