@@ -346,8 +346,12 @@ local function depart(player: Player, planetId: string, difficultyId: string, si
 	local character = player.Character
 	local root = character and character:FindFirstChild("HumanoidRootPart")
 	local pad = world.planetPads[planetId]
+	warn("[CODAG Server] teleport: character =", character ~= nil, "root =", root ~= nil, "pad =", pad ~= nil, "planetId =", planetId)
 	if root and pad then
+		warn("[CODAG Server] teleporting to", pad.CFrame, "+ 8 studs up")
 		root.CFrame = pad.CFrame + Vector3.new(0, 8, 0)
+	else
+		warn("[CODAG Server] teleport FAILED: missing root or pad")
 	end
 	player:SetAttribute("MissionPlanet", planet.name)
 	player:SetAttribute("MissionSide", side)
