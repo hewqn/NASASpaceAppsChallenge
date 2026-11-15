@@ -235,7 +235,7 @@ local function page(name)
 	p.Name = name
 	p.Size = UDim2.new(1, 0, 1, 0)
 	p.CanvasSize = UDim2.new(0, 0, 0, 0)
-	p.AutomaticCanvasSize = Enum.AutomaticCanvasSize.Y
+	p.AutomaticCanvasSize = Enum.AutomaticSize.Y
 	p.ScrollBarThickness = 3
 	p.ScrollBarImageColor3 = ACCENT
 	p.BackgroundColor3 = BG
