@@ -8,8 +8,8 @@ local Catalog = require(ReplicatedStorage:WaitForChild("CODAG").Data.Catalog)
 
 local LOOK = {
 	earth   = { ground = Color3.fromRGB(111, 143,  98), sky = Color3.fromRGB(135, 175, 210), clock = 14 },
-	moon    = { ground = Color3.fromRGB(160, 155, 148), sky = Color3.fromRGB(  4,   4,   8), clock =  0 },
-	mercury = { ground = Color3.fromRGB(140, 130, 118), sky = Color3.fromRGB( 10,   8,   6), clock =  0 },
+	moon    = { ground = Color3.fromRGB(160, 155, 148), sky = Color3.fromRGB(  4,   4,   8), clock = 14 },
+	mercury = { ground = Color3.fromRGB(140, 130, 118), sky = Color3.fromRGB( 10,   8,   6), clock = 14 },
 	venus   = { ground = Color3.fromRGB(180, 130,  60), sky = Color3.fromRGB(160, 110,  40), clock = 12 },
 	mars    = { ground = Color3.fromRGB(170,  90,  55), sky = Color3.fromRGB(180, 120,  80), clock = 10 },
 	jupiter = { ground = Color3.fromRGB(190, 165, 120), sky = Color3.fromRGB(140, 110,  65), clock =  9 },
@@ -387,6 +387,132 @@ local function setupLighting()
 	return atmo
 end
 
+-- ── Obby generator ──────────────────────────────────────────────────────
+-- Procedural obstacle course per planet, scaled by gravity.
+-- Lower gravity = bigger gaps (you jump farther). Beacon at the end.
+
+local EARTH_GRAVITY = 9.82
+
+local function generateObby(parent: Instance, planetId: string, center: Vector3, gravityMs2: number, seed: number): Part
+	local rng = mulberry32(seed)
+	local look = LOOK[planetId] or LOOK.moon
+	local gRatio = math.sqrt(EARTH_GRAVITY / gravityMs2) -- jump distance scale
+
+	-- Platform sizing
+	local platWidth = 6
+	local platDepth = 6
+	local platHeight = 1.2
+
+	-- Color from planet ground, slightly varied
+	local baseColor = look.ground
+	local accentColor = lighten(baseColor, 0.15)
+
+	local obbyFolder = Instance.new("Folder")
+	obbyFolder.Name = planetId .. "Obby"
+	obbyFolder.Parent = parent
+
+	-- Start near landing pad, extend outward along +X
+	local curX = center.X + 15
+	local curY = 3
+	local curZ = center.Z
+
+	-- Number of platforms
+	local count = 15 + math.floor(rng() * 6) -- 15-20
+
+	for i = 1, count do
+		-- Gap distance scaled by gravity ratio
+		local baseGap = 8 + rng() * 6  -- 8-14 studs base gap
+		local gap = baseGap * gRatio
+
+		-- Height change: mostly up, sometimes level, rarely down
+		local roll = rng()
+		local dy
+		if roll < 0.3 then
+			dy = 0 -- level
+		elseif roll < 0.7 then
+			dy = 3 + rng() * 5 -- climb up
+		elseif roll < 0.85 then
+			dy = 8 + rng() * 6 -- big climb (pillar)
+		else
+			dy = -(2 + rng() * 3) -- drop down
+		end
+		dy = dy * gRatio * 0.5 -- scale height changes too
+
+		curX = curX + gap
+		curY = math.max(2, curY + dy)
+		curZ = curZ + (rng() - 0.5) * 8 * gRatio -- slight lateral wobble
+
+		-- Platform width variation
+		local w = platWidth - rng() * 2  -- 4-6 wide
+		local d = platDepth - rng() * 2
+
+		-- Alternate colors for visual rhythm
+		local col = if i % 3 == 0 then accentColor else baseColor
+		local mat = if i % 5 == 0 then Enum.Material.Metal else Enum.Material.Slate
+
+		local plat = part(obbyFolder, "Plat" .. i,
+			Vector3.new(w, platHeight, d),
+			CFrame.new(curX, curY, curZ),
+			col, mat)
+		plat.CastShadow = true
+
+		-- Every few platforms, add a tall pillar underneath for visual weight
+		if dy > 5 or i % 4 == 0 then
+			local pillarH = curY
+			if pillarH > 2 then
+				part(obbyFolder, "Pillar" .. i,
+					Vector3.new(2, pillarH, 2),
+					CFrame.new(curX, pillarH / 2, curZ),
+					darken(baseColor, 0.6), Enum.Material.Concrete)
+			end
+		end
+	end
+
+	-- Beacon at the end: glowing neon cylinder with a light beam
+	local beaconY = curY + 3
+	local beacon = Instance.new("Part")
+	beacon.Name = planetId .. "Beacon"
+	beacon.Shape = Enum.PartType.Cylinder
+	beacon.Size = Vector3.new(5, 3, 3)
+	beacon.CFrame = CFrame.new(curX, beaconY, curZ) * CFrame.Angles(0, 0, math.rad(90))
+	beacon.Color = Color3.fromRGB(60, 255, 120)
+	beacon.Material = Enum.Material.Neon
+	beacon.Transparency = 0.15
+	beacon.Anchored = true
+	beacon.CanCollide = true
+	beacon.CastShadow = false
+	beacon:SetAttribute("PlanetId", planetId)
+	beacon.Parent = obbyFolder
+
+	-- Beacon light
+	local beaconLight = Instance.new("PointLight")
+	beaconLight.Color = Color3.fromRGB(60, 255, 120)
+	beaconLight.Brightness = 3
+	beaconLight.Range = 40
+	beaconLight.Parent = beacon
+
+	-- Upward light beam from beacon
+	local beam = Instance.new("Part")
+	beam.Name = "BeaconBeam"
+	beam.Size = Vector3.new(0.5, 80, 0.5)
+	beam.CFrame = CFrame.new(curX, beaconY + 40, curZ)
+	beam.Color = Color3.fromRGB(60, 255, 120)
+	beam.Material = Enum.Material.Neon
+	beam.Transparency = 0.6
+	beam.Anchored = true
+	beam.CanCollide = false
+	beam.CastShadow = false
+	beam.Parent = obbyFolder
+
+	-- Landing platform under the beacon (bigger, so you can land on it)
+	part(obbyFolder, "BeaconPad",
+		Vector3.new(10, platHeight, 10),
+		CFrame.new(curX, curY, curZ),
+		Color3.fromRGB(40, 180, 80), Enum.Material.Neon)
+
+	return beacon
+end
+
 -- ── Build ────────────────────────────────────────────────────────────────
 
 local function build()
@@ -409,10 +535,10 @@ local function build()
 	-- Generate terrain
 	generateTerrain("earth", earthCenter, earthRadius, 42)
 
-	-- Clear a flat area around spawn and workshop
+	-- Clear a flat area around spawn and station
 	local clearRegion = Region3.new(
 		Vector3.new(-50, -5, -50),
-		Vector3.new(50, 15, 50)
+		Vector3.new(50, 40, 50)
 	):ExpandToGrid(4)
 	terrain:FillRegion(clearRegion, 4, Enum.Material.Air)
 	-- Re-fill ground in cleared area
@@ -435,144 +561,499 @@ local function build()
 	spawn.BottomSurface = Enum.SurfaceType.Smooth
 	spawn.Parent = earth
 
-	-- Workshop building (more substantial)
-	local shedColor = Color3.fromRGB(75, 52, 35)
-	local shedFloor = Color3.fromRGB(55, 40, 28)
+	-- ── Space station hub ────────────────────────────────────────────────
+	local hull     = Color3.fromRGB(235, 238, 242)  -- bright white
+	local hullAlt  = Color3.fromRGB(200, 205, 212)  -- panel grey
+	local floorCol = Color3.fromRGB(90, 95, 100)
+	local accent   = Color3.fromRGB(40, 140, 255)   -- NASA blue
+	local warn     = Color3.fromRGB(255, 140, 40)   -- caution orange
+	local SP = Enum.Material.SmoothPlastic           -- renders bright
+	local habZ = -20  -- center of the station
+
+	-- Landing pad (dark disc under the station)
+	local pad = Instance.new("Part")
+	pad.Name = "LandingPad"
+	pad.Shape = Enum.PartType.Cylinder
+	pad.Size = Vector3.new(0.25, 22, 22)
+	pad.CFrame = CFrame.new(0, 0.13, habZ) * CFrame.Angles(0, 0, math.rad(90))
+	pad.Color = Color3.fromRGB(50, 55, 62)
+	pad.Material = SP
+	pad.Anchored = true
+	pad.Parent = earth
+	-- Glow ring around pad edge
+	local ring = Instance.new("Part")
+	ring.Name = "PadRing"
+	ring.Shape = Enum.PartType.Cylinder
+	ring.Size = Vector3.new(0.08, 23, 23)
+	ring.CFrame = CFrame.new(0, 0.04, habZ) * CFrame.Angles(0, 0, math.rad(90))
+	ring.Color = accent
+	ring.Material = Enum.Material.Neon
+	ring.Transparency = 0.3
+	ring.Anchored = true
+	ring.Parent = earth
+
+	-- ── Hull (ground level, walkable interior) ──────────────────────────
+	local W, H, D = 14, 8, 12
+	local by = 0.4  -- base Y
 
 	-- Floor
-	part(earth, "ShedFloor", Vector3.new(18, 0.3, 14), CFrame.new(0, 0.15, -30),
-		shedFloor, Enum.Material.WoodPlanks)
+	part(earth, "HullFloor", Vector3.new(W, 0.3, D),
+		CFrame.new(0, by, habZ), floorCol, SP)
 
-	-- Walls
-	part(earth, "ShedWallBack", Vector3.new(18, 10, 0.6), CFrame.new(0, 5, -37),
-		shedColor, Enum.Material.Wood)
-	part(earth, "ShedWallLeft", Vector3.new(0.6, 10, 14), CFrame.new(-9, 5, -30),
-		darken(shedColor, 0.85), Enum.Material.Wood)
-	part(earth, "ShedWallRight", Vector3.new(0.6, 10, 14), CFrame.new(9, 5, -30),
-		darken(shedColor, 0.85), Enum.Material.Wood)
-	-- Front wall with door gap
-	part(earth, "ShedWallFrontL", Vector3.new(6, 10, 0.6), CFrame.new(-6, 5, -23),
-		shedColor, Enum.Material.Wood)
-	part(earth, "ShedWallFrontR", Vector3.new(6, 10, 0.6), CFrame.new(6, 5, -23),
-		shedColor, Enum.Material.Wood)
-	part(earth, "ShedWallFrontTop", Vector3.new(6, 2, 0.6), CFrame.new(0, 9, -23),
-		shedColor, Enum.Material.Wood)
+	-- Back wall
+	part(earth, "HullBack", Vector3.new(W, H, 0.4),
+		CFrame.new(0, by + H/2, habZ - D/2), hull, SP)
+	-- Side walls
+	part(earth, "HullLeft", Vector3.new(0.4, H, D),
+		CFrame.new(-W/2, by + H/2, habZ), hull, SP)
+	part(earth, "HullRight", Vector3.new(0.4, H, D),
+		CFrame.new(W/2, by + H/2, habZ), hull, SP)
+
+	-- Front wall (open doorway in center)
+	part(earth, "HullFrontL", Vector3.new(3.5, H, 0.4),
+		CFrame.new(-W/2 + 1.75, by + H/2, habZ + D/2), hull, SP)
+	part(earth, "HullFrontR", Vector3.new(3.5, H, 0.4),
+		CFrame.new(W/2 - 1.75, by + H/2, habZ + D/2), hull, SP)
+	part(earth, "DoorLintel", Vector3.new(W - 7, 1.5, 0.4),
+		CFrame.new(0, by + H - 0.75, habZ + D/2), hull, SP)
 
 	-- Roof
-	wedge(earth, "ShedRoofL", Vector3.new(18, 5, 8),
-		CFrame.new(0, 12, -26.5),
-		darken(shedColor, 0.55), Enum.Material.Slate)
-	wedge(earth, "ShedRoofR", Vector3.new(18, 5, 8),
-		CFrame.new(0, 12, -33.5) * CFrame.Angles(0, math.rad(180), 0),
-		darken(shedColor, 0.55), Enum.Material.Slate)
+	part(earth, "HullRoof", Vector3.new(W + 0.6, 0.35, D + 0.6),
+		CFrame.new(0, by + H + 0.17, habZ), hullAlt, SP)
 
-	-- Workbench inside
-	part(earth, "Workbench", Vector3.new(12, 1.2, 3), CFrame.new(0, 3.6, -35),
-		Color3.fromRGB(90, 65, 42), Enum.Material.WoodPlanks)
+	-- ── Neon accent lines ───────────────────────────────────────────────
+	-- Horizontal blue band around the hull at ~40% height
+	local bandY = by + H * 0.4
+	part(earth, "BandBack", Vector3.new(W + 0.3, 0.2, 0.45),
+		CFrame.new(0, bandY, habZ - D/2), accent, Enum.Material.Neon)
+	part(earth, "BandLeft", Vector3.new(0.45, 0.2, D + 0.3),
+		CFrame.new(-W/2, bandY, habZ), accent, Enum.Material.Neon)
+	part(earth, "BandRight", Vector3.new(0.45, 0.2, D + 0.3),
+		CFrame.new(W/2, bandY, habZ), accent, Enum.Material.Neon)
+	-- Door frame glow
+	part(earth, "DoorGlowL", Vector3.new(0.12, H, 0.45),
+		CFrame.new(-W/2 + 3.5, by + H/2, habZ + D/2), accent, Enum.Material.Neon)
+	part(earth, "DoorGlowR", Vector3.new(0.12, H, 0.45),
+		CFrame.new(W/2 - 3.5, by + H/2, habZ + D/2), accent, Enum.Material.Neon)
+	-- Caution stripe at threshold
+	part(earth, "Caution", Vector3.new(W - 7, 0.05, 0.6),
+		CFrame.new(0, by + 0.18, habZ + D/2), warn, Enum.Material.Neon)
 
-	-- Hanging light inside workshop
-	local light = Instance.new("Part")
-	light.Name = "ShopLight"
-	light.Shape = Enum.PartType.Ball
-	light.Size = Vector3.new(1.5, 1.5, 1.5)
-	light.CFrame = CFrame.new(0, 9, -30)
-	light.Color = Color3.fromRGB(255, 220, 160)
-	light.Material = Enum.Material.Neon
-	light.Transparency = 0.1
-	light.Anchored = true
-	light.CanCollide = false
-	light.Parent = earth
-	local pointLight = Instance.new("PointLight")
-	pointLight.Color = Color3.fromRGB(255, 230, 180)
-	pointLight.Brightness = 1.5
-	pointLight.Range = 30
-	pointLight.Parent = light
+	-- ── Glass viewports ─────────────────────────────────────────────────
+	local glassCol = Color3.fromRGB(100, 180, 240)
+	-- Front viewport above door
+	local vp = part(earth, "Viewport", Vector3.new(W - 7, 2, 0.25),
+		CFrame.new(0, by + H - 2.5, habZ + D/2), glassCol, Enum.Material.Glass)
+	vp.Transparency = 0.35
+	-- Side portholes
+	for wi = 1, 2 do
+		local wz = habZ - D/4 + (wi - 1) * D/2
+		local pL = part(earth, "PortL" .. wi, Vector3.new(0.25, 2.5, 2.5),
+			CFrame.new(-W/2 + 0.1, by + H * 0.55, wz), glassCol, Enum.Material.Glass)
+		pL.Transparency = 0.35
+		local pR = part(earth, "PortR" .. wi, Vector3.new(0.25, 2.5, 2.5),
+			CFrame.new(W/2 - 0.1, by + H * 0.55, wz), glassCol, Enum.Material.Glass)
+		pR.Transparency = 0.35
+	end
 
-	-- Trees (using terrain-style placement)
+	-- ── Solar panel wings ───────────────────────────────────────────────
+	for _, side in { -1, 1 } do
+		local sx = side * (W/2 + 6)
+		-- Support arm
+		part(earth, "SolarArm" .. side, Vector3.new(8, 0.25, 0.25),
+			CFrame.new(side * (W/2 + 4), by + H * 0.55, habZ), hullAlt, SP)
+		-- Panel
+		part(earth, "SolarWing" .. side, Vector3.new(6, 0.08, 8),
+			CFrame.new(sx, by + H * 0.55, habZ),
+			Color3.fromRGB(30, 50, 100), SP)
+		-- Grid line
+		part(earth, "SolarLine" .. side, Vector3.new(6.05, 0.04, 0.08),
+			CFrame.new(sx, by + H * 0.55 + 0.05, habZ),
+			Color3.fromRGB(60, 85, 150), SP)
+	end
+
+	-- ── Antenna + beacon ────────────────────────────────────────────────
+	part(earth, "AntPole", Vector3.new(0.25, 4, 0.25),
+		CFrame.new(0, by + H + 2.2, habZ - 3), hullAlt, SP)
+	part(earth, "AntCross", Vector3.new(3, 0.12, 0.12),
+		CFrame.new(0, by + H + 4.2, habZ - 3), accent, Enum.Material.Neon)
+	local blink = part(earth, "AntLight", Vector3.new(0.4, 0.4, 0.4),
+		CFrame.new(0, by + H + 4.5, habZ - 3),
+		Color3.fromRGB(255, 50, 50), Enum.Material.Neon)
+	local bl = Instance.new("PointLight")
+	bl.Color = Color3.fromRGB(255, 50, 50)
+	bl.Brightness = 2
+	bl.Range = 15
+	bl.Parent = blink
+
+	-- ── Interior furnishing ─────────────────────────────────────────────
+	-- Workbench along back wall
+	part(earth, "Workbench", Vector3.new(10, 0.5, 2.5),
+		CFrame.new(0, by + 2, habZ - D/2 + 2), Color3.fromRGB(65, 70, 75), SP)
+	for _, lx in { -4, -1, 2, 5 } do
+		part(earth, "BenchLeg" .. lx, Vector3.new(0.25, 1.6, 0.25),
+			CFrame.new(lx, by + 1.1, habZ - D/2 + 2), hullAlt, SP)
+	end
+
+	-- Ceiling strip lights
+	for li = 1, 2 do
+		local lz = habZ - D/4 + (li - 1) * D/2
+		local strip = part(earth, "CLight" .. li, Vector3.new(W - 3, 0.12, 0.7),
+			CFrame.new(0, by + H - 0.25, lz),
+			Color3.fromRGB(220, 230, 255), Enum.Material.Neon)
+		strip.Transparency = 0.1
+		local pl = Instance.new("PointLight")
+		pl.Color = Color3.fromRGB(220, 230, 255)
+		pl.Brightness = 1.5
+		pl.Range = 20
+		pl.Parent = strip
+	end
+
+	-- ── Exterior ────────────────────────────────────────────────────────
+	-- Trees
 	local treeSeeds = mulberry32(42)
-	for i = 1, 18 do
+	for i = 1, 14 do
 		local angle = treeSeeds() * math.pi * 2
-		local dist = 40 + treeSeeds() * 100
+		local dist = 50 + treeSeeds() * 100
 		local tx = math.cos(angle) * dist
 		local tz = math.sin(angle) * dist
 
-		-- Skip if too close to workshop
-		if math.abs(tx) > 20 or math.abs(tz + 30) > 25 then
+		if math.abs(tx) > 25 or math.abs(tz + 20) > 25 then
 			local trunkH = 5 + treeSeeds() * 7
 			local trunkW = 0.8 + treeSeeds() * 0.6
 			part(earth, "Trunk" .. i, Vector3.new(trunkW, trunkH, trunkW),
 				CFrame.new(tx, trunkH / 2, tz),
 				Color3.fromRGB(70 + math.floor(treeSeeds() * 20), 48, 30), Enum.Material.Wood)
-
-			-- Multi-layer foliage
 			local foliageBase = 4 + treeSeeds() * 5
-			local greenR = 45 + math.floor(treeSeeds() * 35)
-			local greenG = 95 + math.floor(treeSeeds() * 50)
-			local greenB = 35 + math.floor(treeSeeds() * 25)
 			ball(earth, "Foliage" .. i, foliageBase,
 				CFrame.new(tx, trunkH + foliageBase * 0.2, tz),
-				Color3.fromRGB(greenR, greenG, greenB), Enum.Material.LeafyGrass)
-			-- Upper canopy
-			ball(earth, "Canopy" .. i, foliageBase * 0.7,
-				CFrame.new(tx + treeSeeds() * 1.5, trunkH + foliageBase * 0.6, tz + treeSeeds() * 1.5),
-				Color3.fromRGB(greenR - 10, greenG + 10, greenB), Enum.Material.LeafyGrass)
+				Color3.fromRGB(55 + math.floor(treeSeeds() * 30), 110 + math.floor(treeSeeds() * 40), 40),
+				Enum.Material.LeafyGrass)
 		end
 	end
 
-	-- Stone path from spawn to workshop
-	local pathRng = mulberry32(999)
-	for i = 0, 14 do
-		local wobble = (pathRng() - 0.5) * 2
-		local sz = 2.5 + pathRng() * 2
-		part(earth, "Path" .. i, Vector3.new(sz, 0.15, sz),
-			CFrame.new(wobble, 0.08, 18 - i * 2.8) * CFrame.Angles(0, pathRng() * 0.3, 0),
-			Color3.fromRGB(145 + math.floor(pathRng() * 20), 135, 118), Enum.Material.Cobblestone)
+	-- Lit walkway from spawn to station
+	for i = 0, 8 do
+		local wz = 18 - i * 4.5
+		part(earth, "Walk" .. i, Vector3.new(4, 0.1, 2.8),
+			CFrame.new(0, 0.05, wz), Color3.fromRGB(55, 60, 65), SP)
+		-- Edge lights every other slab
+		if i % 2 == 0 then
+			part(earth, "WalkLight" .. i, Vector3.new(0.15, 0.15, 2.8),
+				CFrame.new(-2.1, 0.12, wz), accent, Enum.Material.Neon)
+			part(earth, "WalkLightR" .. i, Vector3.new(0.15, 0.15, 2.8),
+				CFrame.new(2.1, 0.12, wz), accent, Enum.Material.Neon)
+		end
 	end
 
-	-- ── Material caches ──────────────────────────────────────────────────
-	-- Placed around the workshop, each with a glow pad
+	-- ── Supply depot (materials on industrial shelving racks) ────────────
 
 	local caches = {}
-	for _, material in Catalog.MATERIALS do
-		local x = material.position[1] * 10
-		local z = material.position[3] * 10
 
-		-- Glowing pad
-		local basePad = part(earth, material.id .. "Pad", Vector3.new(5, 0.15, 5),
-			CFrame.new(x, 0.08, z),
-			hexColor(material.color), Enum.Material.Neon)
-		basePad.Transparency = 0.5
+	local depotX = 14
+	local rackSpacing = 5.5
+	local rackW = 6
+	local rackD = 2.5
+	local shelfStep = 2.2
 
-		-- The cache with appropriate shape
+	-- Build a metal shelving rack frame
+	local function buildRack(rackX, rackZ, rackLabel)
+		local postCol = Color3.fromRGB(65, 72, 82)
+		local shelfCol = Color3.fromRGB(82, 88, 98)
+		local totalH = 7.2
+
+		for _, dx in { -(rackW / 2 - 0.1), rackW / 2 - 0.1 } do
+			for _, dz in { -(rackD / 2 - 0.1), rackD / 2 - 0.1 } do
+				part(earth, "RackPost", Vector3.new(0.2, totalH, 0.2),
+					CFrame.new(rackX + dx, totalH / 2 + 0.3, rackZ + dz),
+					postCol, Enum.Material.Metal)
+			end
+		end
+		for level = 0, 2 do
+			local sy = 0.3 + level * shelfStep
+			part(earth, "Shelf" .. level, Vector3.new(rackW, 0.12, rackD),
+				CFrame.new(rackX, sy, rackZ), shelfCol, SP)
+		end
+		part(earth, "RackCap", Vector3.new(rackW, 0.08, rackD),
+			CFrame.new(rackX, totalH + 0.3, rackZ), postCol, Enum.Material.Metal)
+
+		if rackLabel then
+			local sign = part(earth, "RackSign", Vector3.new(rackW - 0.4, 0.5, 0.05),
+				CFrame.new(rackX, totalH - 0.3, rackZ + rackD / 2 + 0.05),
+				accent, SP)
+			local sg = Instance.new("SurfaceGui")
+			sg.Face = Enum.NormalId.Front
+			sg.SizingMode = Enum.SurfaceGuiSizingMode.PixelsPerStud
+			sg.PixelsPerStud = 40
+			sg.Parent = sign
+			local lbl = Instance.new("TextLabel")
+			lbl.Size = UDim2.fromScale(1, 1)
+			lbl.BackgroundTransparency = 1
+			lbl.Font = Enum.Font.GothamBold
+			lbl.TextColor3 = hull
+			lbl.TextScaled = true
+			lbl.Text = rackLabel
+			lbl.Parent = sg
+		end
+	end
+
+	-- Compact material shapes for shelf display
+	local function materialShape(mat, x: number, z: number, baseY: number): Part
+		local col = hexColor(mat.color)
 		local pile
-		if material.structural then
-			pile = part(earth, material.id, Vector3.new(3.5, 3.5, 3.5),
-				CFrame.new(x, 2, z) * CFrame.Angles(0, math.rad(45), 0),
-				hexColor(material.color), Enum.Material.DiamondPlate)
-		elseif material.id == "oxygen" then
+		baseY = baseY or 0.4
+
+		if mat.id == "aluminum" then
+			-- Stacked flat metal sheets
+			for si = 0, 2 do
+				local sheet = part(earth, "AlSheet" .. si,
+					Vector3.new(2.5, 0.1, 1.5),
+					CFrame.new(x + si * 0.08, baseY + 0.08 + si * 0.12, z),
+					lighten(col, si * 0.03), Enum.Material.Metal)
+				if si == 2 then pile = sheet end
+			end
+
+		elseif mat.id == "steel" then
+			-- Short I-beam section
+			part(earth, "SteelWeb", Vector3.new(3, 0.3, 0.3),
+				CFrame.new(x, baseY + 0.35, z), col, Enum.Material.DiamondPlate)
+			part(earth, "SteelFT", Vector3.new(3, 0.1, 1),
+				CFrame.new(x, baseY + 0.55, z), col, Enum.Material.DiamondPlate)
+			pile = part(earth, mat.id, Vector3.new(3, 0.1, 1),
+				CFrame.new(x, baseY + 0.2, z), col, Enum.Material.DiamondPlate)
+
+		elseif mat.id == "titanium" then
+			-- Polished ingot blocks
+			pile = part(earth, mat.id, Vector3.new(2.2, 0.8, 1.5),
+				CFrame.new(x, baseY + 0.5, z), col, SP)
+			part(earth, "TiBlock2", Vector3.new(1.5, 0.6, 1.2),
+				CFrame.new(x + 0.8, baseY + 0.4, z + 0.3), lighten(col, 0.05), SP)
+
+		elseif mat.id == "carbonfiber" then
+			-- Dark woven panels stacked flat
+			for si = 0, 2 do
+				local panel = part(earth, "CFPanel" .. si,
+					Vector3.new(2.5, 0.08, 1.8),
+					CFrame.new(x, baseY + 0.06 + si * 0.1, z),
+					lighten(col, si * 0.02), SP)
+				if si == 2 then pile = panel end
+			end
+
+		elseif mat.id == "copper" then
+			-- Bundle of short pipes lying on the shelf
+			for pi = 0, 2 do
+				local pipe = Instance.new("Part")
+				pipe.Name = "CuPipe" .. pi
+				pipe.Shape = Enum.PartType.Cylinder
+				pipe.Size = Vector3.new(2.5, 0.45, 0.45)
+				pipe.CFrame = CFrame.new(x, baseY + 0.25 + pi * 0.05, z - 0.25 + pi * 0.25)
+				pipe.Color = lighten(col, pi * 0.04)
+				pipe.Material = Enum.Material.Metal
+				pipe.Anchored = true
+				pipe.Parent = earth
+				if pi == 2 then pile = pipe end
+			end
+
+		elseif mat.id == "glass" then
+			-- Transparent panes standing
+			pile = part(earth, mat.id, Vector3.new(2, 1.2, 0.15),
+				CFrame.new(x, baseY + 0.7, z), col, Enum.Material.Glass)
+			pile.Transparency = 0.3
+			local pane2 = part(earth, "GlassPane2", Vector3.new(1.8, 1, 0.12),
+				CFrame.new(x + 0.3, baseY + 0.6, z + 0.3), lighten(col, 0.05), Enum.Material.Glass)
+			pane2.Transparency = 0.35
+
+		elseif mat.id == "aerogel" then
+			-- Translucent block with inner glow
+			pile = part(earth, mat.id, Vector3.new(2, 1.2, 1.5),
+				CFrame.new(x, baseY + 0.7, z), col, Enum.Material.Glass)
+			pile.Transparency = 0.4
+			local glow = Instance.new("PointLight")
+			glow.Color = col
+			glow.Brightness = 0.4
+			glow.Range = 6
+			glow.Parent = pile
+
+		elseif mat.id == "wool" then
+			-- Rolled batting cylinder
 			pile = Instance.new("Part")
-			pile.Name = material.id
+			pile.Name = mat.id
 			pile.Shape = Enum.PartType.Cylinder
-			pile.Size = Vector3.new(4.5, 2, 2)
-			pile.CFrame = CFrame.new(x, 1.5, z) * CFrame.Angles(0, 0, math.rad(90))
-			pile.Color = hexColor(material.color)
+			pile.Size = Vector3.new(2, 1.5, 1.5)
+			pile.CFrame = CFrame.new(x, baseY + 0.85, z) * CFrame.Angles(0, math.rad(20), math.rad(90))
+			pile.Color = col
+			pile.Material = Enum.Material.Fabric
+			pile.Anchored = true
+			pile.Parent = earth
+
+		elseif mat.id == "polyfoam" then
+			-- Spray foam blocks
+			pile = part(earth, mat.id, Vector3.new(2, 1, 1.5),
+				CFrame.new(x, baseY + 0.6, z), col, SP)
+			part(earth, "FoamBlock2", Vector3.new(1.2, 0.8, 1),
+				CFrame.new(x + 0.7, baseY + 0.5, z + 0.3), lighten(col, 0.05), SP)
+
+		elseif mat.id == "mylar" then
+			-- Rolled foil
+			pile = Instance.new("Part")
+			pile.Name = mat.id
+			pile.Shape = Enum.PartType.Cylinder
+			pile.Size = Vector3.new(2.2, 1.2, 1.2)
+			pile.CFrame = CFrame.new(x, baseY + 0.7, z) * CFrame.Angles(0, math.rad(10), math.rad(90))
+			pile.Color = col
+			pile.Material = Enum.Material.Foil
+			pile.Anchored = true
+			pile.Parent = earth
+
+		elseif mat.id == "fiberglass" then
+			-- Batting roll
+			pile = Instance.new("Part")
+			pile.Name = mat.id
+			pile.Shape = Enum.PartType.Cylinder
+			pile.Size = Vector3.new(2, 1.4, 1.4)
+			pile.CFrame = CFrame.new(x, baseY + 0.8, z) * CFrame.Angles(0, math.rad(-15), math.rad(90))
+			pile.Color = col
+			pile.Material = Enum.Material.Fabric
+			pile.Anchored = true
+			pile.Parent = earth
+
+		elseif mat.id == "kevlar" then
+			-- Woven fabric roll
+			pile = Instance.new("Part")
+			pile.Name = mat.id
+			pile.Shape = Enum.PartType.Cylinder
+			pile.Size = Vector3.new(2.2, 1.3, 1.3)
+			pile.CFrame = CFrame.new(x, baseY + 0.75, z) * CFrame.Angles(0, math.rad(25), math.rad(90))
+			pile.Color = col
+			pile.Material = Enum.Material.Fabric
+			pile.Anchored = true
+			pile.Parent = earth
+
+		elseif mat.id == "oxygen" then
+			-- Small upright gas cylinder with valve cap
+			pile = Instance.new("Part")
+			pile.Name = mat.id
+			pile.Shape = Enum.PartType.Cylinder
+			pile.Size = Vector3.new(1.6, 0.6, 0.6)
+			pile.CFrame = CFrame.new(x, baseY + 0.9, z)
+			pile.Color = col
 			pile.Material = Enum.Material.Metal
 			pile.Anchored = true
 			pile.Parent = earth
+			local cap = Instance.new("Part")
+			cap.Name = "O2Cap"
+			cap.Shape = Enum.PartType.Cylinder
+			cap.Size = Vector3.new(0.3, 0.7, 0.7)
+			cap.CFrame = CFrame.new(x, baseY + 1.75, z)
+			cap.Color = darken(col, 0.6)
+			cap.Material = Enum.Material.Metal
+			cap.Anchored = true
+			cap.Parent = earth
+
 		else
-			pile = ball(earth, material.id, 3.5, CFrame.new(x, 2, z),
-				hexColor(material.color), Enum.Material.Fabric)
+			-- Fallback: labeled box
+			pile = part(earth, mat.id, Vector3.new(2, 1.2, 1.5),
+				CFrame.new(x, baseY + 0.7, z), col, Enum.Material.Metal)
 		end
+
+		return pile
+	end
+
+	-- Material assignments: { id, rack index, shelf level (0=bottom 1=mid 2=top) }
+	local depotLayout = {
+		{ id = "aluminum",    rack = 1, level = 0 },
+		{ id = "steel",       rack = 1, level = 1 },
+		{ id = "titanium",    rack = 1, level = 2 },
+		{ id = "carbonfiber", rack = 2, level = 0 },
+		{ id = "copper",      rack = 2, level = 1 },
+		{ id = "glass",       rack = 2, level = 2 },
+		{ id = "aerogel",     rack = 3, level = 0 },
+		{ id = "wool",        rack = 3, level = 1 },
+		{ id = "polyfoam",    rack = 3, level = 2 },
+		{ id = "mylar",       rack = 4, level = 0 },
+		{ id = "fiberglass",  rack = 4, level = 1 },
+		{ id = "kevlar",      rack = 4, level = 2 },
+	}
+
+	-- Rack center positions along the station side
+	local rackCenters = {}
+	for i = 1, 4 do
+		rackCenters[i] = { x = depotX, z = habZ + 6 - (i - 1) * rackSpacing }
+	end
+
+	local rackLabels = { "STRUCTURAL A", "STRUCTURAL B", "INSULATION A", "INSULATION B" }
+	for i, rc in rackCenters do
+		buildRack(rc.x, rc.z, rackLabels[i])
+	end
+
+	-- Depot canopy roof
+	local canopyLen = rackSpacing * 3 + rackD + 3
+	local canopyMid = habZ + 6 - 1.5 * rackSpacing
+	part(earth, "DepotRoof", Vector3.new(rackW + 3, 0.12, canopyLen),
+		CFrame.new(depotX, 7.8, canopyMid), hullAlt, SP)
+	for _, cz in { habZ + 7, habZ + 6 - 3 * rackSpacing - 1 } do
+		part(earth, "CanopyCol", Vector3.new(0.25, 7.8, 0.25),
+			CFrame.new(depotX - rackW / 2 - 1, 3.9, cz), hull, SP)
+		part(earth, "CanopyCol", Vector3.new(0.25, 7.8, 0.25),
+			CFrame.new(depotX + rackW / 2 + 1, 3.9, cz), hull, SP)
+	end
+	part(earth, "CanopyAccent", Vector3.new(rackW + 3, 0.2, 0.15),
+		CFrame.new(depotX, 7.9, canopyMid + canopyLen / 2),
+		accent, Enum.Material.Neon).Transparency = 0.3
+
+	-- Walkway from station to depot
+	part(earth, "DepotWalk", Vector3.new(4, 0.15, 0.8),
+		CFrame.new(9, 0.08, habZ), floorCol, SP)
+	part(earth, "DepotWalkGlow", Vector3.new(3.5, 0.06, 0.3),
+		CFrame.new(9, 0.18, habZ), accent, Enum.Material.Neon).Transparency = 0.4
+
+	-- Place materials on shelves
+	for _, entry in depotLayout do
+		local material = Catalog.materialById(entry.id)
+		local rc = rackCenters[entry.rack]
+		local shelfY = 0.3 + entry.level * shelfStep + 0.12
+
+		local pile = materialShape(material, rc.x, rc.z, shelfY)
 		if pile.Parent == nil then
 			pile.Parent = earth
 		end
 		pile:SetAttribute("MaterialId", material.id)
 		pile.CastShadow = true
 
-		-- Proximity prompt (no floating billboard labels)
 		local use = prompt(pile, "Pick up", material.name)
 		caches[material.id] = { part = pile, prompt = use }
 	end
+
+	-- Oxygen standalone display (life support pedestal)
+	local o2X = depotX
+	local o2Z = rackCenters[4].z - rackSpacing
+	part(earth, "O2Stand", Vector3.new(2.5, 0.8, 2.5),
+		CFrame.new(o2X, 0.4, o2Z), hullAlt, SP)
+	part(earth, "O2StandGlow", Vector3.new(2.5, 0.06, 2.5),
+		CFrame.new(o2X, 0.81, o2Z), hexColor("#d45d4a"), Enum.Material.Neon).Transparency = 0.4
+	local o2Sign = part(earth, "O2Label", Vector3.new(2.5, 0.4, 0.05),
+		CFrame.new(o2X, 1.5, o2Z + 1.3), accent, SP)
+	local o2sg = Instance.new("SurfaceGui")
+	o2sg.Face = Enum.NormalId.Front
+	o2sg.SizingMode = Enum.SurfaceGuiSizingMode.PixelsPerStud
+	o2sg.PixelsPerStud = 40
+	o2sg.Parent = o2Sign
+	local o2lbl = Instance.new("TextLabel")
+	o2lbl.Size = UDim2.fromScale(1, 1)
+	o2lbl.BackgroundTransparency = 1
+	o2lbl.Font = Enum.Font.GothamBold
+	o2lbl.TextColor3 = hull
+	o2lbl.TextScaled = true
+	o2lbl.Text = "LIFE SUPPORT"
+	o2lbl.Parent = o2sg
+
+	local o2Mat = Catalog.materialById("oxygen")
+	local o2Pile = materialShape(o2Mat, o2X, o2Z, 0.81)
+	if o2Pile.Parent == nil then o2Pile.Parent = earth end
+	o2Pile:SetAttribute("MaterialId", "oxygen")
+	o2Pile.CastShadow = true
+	local o2Use = prompt(o2Pile, "Pick up", o2Mat.name)
+	caches["oxygen"] = { part = o2Pile, prompt = o2Use }
 
 	-- ── Build pads ───────────────────────────────────────────────────────
 	-- Three pads inside/near the workshop
@@ -623,9 +1104,12 @@ local function build()
 	end
 
 	-- Build bench (interaction point)
+	-- Build console (station-style workbench)
 	local bench = part(earth, "Bench", Vector3.new(24, 1, 6),
-		CFrame.new(-5, 0.5, -20),
-		Color3.fromRGB(50, 42, 34), Enum.Material.WoodPlanks)
+		CFrame.new(-5, 0.5, habZ), hullAlt, SP)
+	local benchSurface = part(earth, "BenchGlow", Vector3.new(24, 0.06, 6),
+		CFrame.new(-5, 1.03, habZ), accent, Enum.Material.Neon)
+	benchSurface.Transparency = 0.6
 	local buildPrompt = prompt(bench, "Build", "Suit")
 
 	-- ── Planet destinations ──────────────────────────────────────────────
@@ -638,6 +1122,7 @@ local function build()
 	destinations.Parent = folder
 
 	local planetPads = {}
+	local beacons = {}
 	for index, planet in Catalog.PLANETS do
 		if planet.id ~= "earth" then
 			local look = LOOK[planet.id] or LOOK.moon
@@ -686,6 +1171,10 @@ local function build()
 			-- Particle effects
 			addParticles(destinations, center, PARTICLES[planet.id])
 
+			-- Obstacle course with beacon goal
+			local beacon = generateObby(destinations, planet.id, center, planet.gravityMs2, index * 313)
+			beacons[planet.id] = beacon
+
 			-- Ambient point lights for gas/ice giants (bioluminescent-style)
 			if planet.archetype == "gas" or planet.archetype == "ice" then
 				local lightRng = mulberry32(index * 777)
@@ -724,6 +1213,7 @@ local function build()
 		bench = bench,
 		buildPrompt = buildPrompt,
 		planetPads = planetPads,
+		beacons = beacons,
 		hexColor = hexColor,
 	}
 end

@@ -102,7 +102,10 @@ local function gravityFor(planetId: string): number
 	return Physics.gravityStuds(Catalog.planetById(planetId).gravityMs2, earthG)
 end
 
+local DEMO_MODE = true -- hackathon: all planets open
+
 local function unlocked(session, planetId: string): boolean
+	if DEMO_MODE then return true end
 	local previous = nil
 	for _, id in Sources.DESTINATION_ORDER do
 		if id == planetId then
@@ -135,8 +138,10 @@ local function publicDesign(design)
 end
 
 local function sendState(player: Player)
+	warn("[CODAG Server] sendState called for", player.Name)
 	local session = sessions[player]
 	if session == nil then
+		warn("[CODAG Server] sendState: no session for", player.Name)
 		return
 	end
 	local clears = {}
@@ -245,7 +250,7 @@ local function finishMission(player: Player)
 	local mission = session.mission
 	session.mission = nil
 	player:SetAttribute("InMission", false)
-	local madeIt = Survival.survived(mission.vitals)
+	local madeIt = Survival.survived(mission.vitals) or mission.vitals.reachedBeacon == true
 	if madeIt then
 		session.clears[mission.planetId] = true
 	end
@@ -266,9 +271,9 @@ local function finishMission(player: Player)
 		difficultyId = mission.difficultyId,
 		side = mission.side,
 		survived = madeIt,
-		title = if madeIt then "Twenty minutes on " .. planet.name .. "." else Survival.deathTitle(cause),
+		title = if madeIt then "You made it across " .. planet.name .. "." else Survival.deathTitle(cause),
 		detail = if madeIt
-			then "Your core stayed near 37 C and you still had oxygen."
+			then "You reached the beacon. Your suit held."
 			else Survival.deathDetail(planet, mission.side, cause),
 		facts = lines,
 	})
@@ -300,14 +305,16 @@ local function stepMission(player: Player, realDt: number)
 	player:SetAttribute("AirHeld", held)
 	player:SetAttribute("Alive", vitals.alive)
 	player:SetAttribute("CauseTitle", if vitals.cause then Survival.deathTitle(vitals.cause) else "")
-	if not vitals.alive or Survival.survived(vitals) then
+	if not vitals.alive or vitals.reachedBeacon or Survival.survived(vitals) then
 		finishMission(player)
 	end
 end
 
 local function depart(player: Player, planetId: string, difficultyId: string, side: string)
+	warn("[CODAG Server] depart called:", player.Name, planetId, difficultyId, side)
 	local session = sessions[player]
 	if session == nil or session.mission ~= nil then
+		warn("[CODAG Server] depart: rejected (nil session or active mission)")
 		return
 	end
 	if side ~= "hot" and side ~= "cold" then
@@ -366,6 +373,7 @@ local function collect(player: Player, materialId: string)
 end
 
 local function startSession(player: Player)
+	warn("[CODAG Server] startSession for", player.Name)
 	sessions[player] = {
 		inventory = emptyInventory(),
 		design = Design.emptyDesign(),
@@ -381,6 +389,22 @@ end
 for _, cache in world.caches do
 	cache.prompt.Triggered:Connect(function(player)
 		collect(player, cache.part:GetAttribute("MaterialId"))
+	end)
+end
+
+-- Beacon touch = mission complete
+for planetId, beacon in world.beacons do
+	beacon.Touched:Connect(function(hit)
+		local character = hit.Parent
+		if character == nil then return end
+		local player = Players:GetPlayerFromCharacter(character)
+		if player == nil then return end
+		local session = sessions[player]
+		if session == nil or session.mission == nil then return end
+		if session.mission.planetId ~= planetId then return end
+		if session.mission.vitals.alive then
+			session.mission.vitals.reachedBeacon = true
+		end
 	end)
 end
 
@@ -459,7 +483,9 @@ SetOxygen.OnServerEvent:Connect(function(player, kg)
 end)
 
 Depart.OnServerEvent:Connect(function(player, planetId, difficultyId, side)
+	warn("[CODAG Server] Depart event:", player.Name, planetId, difficultyId, side)
 	if typeof(planetId) ~= "string" or typeof(difficultyId) ~= "string" or typeof(side) ~= "string" then
+		warn("[CODAG Server] Depart: type check failed")
 		return
 	end
 	depart(player, planetId, difficultyId, side)

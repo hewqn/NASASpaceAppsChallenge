@@ -230,19 +230,30 @@ local function clear(frame)
 end
 
 -- ── Pages ───────────────────────────────────────────────────────────────
-local function page(name)
+local function page(name, isPanel)
 	local p = Instance.new("ScrollingFrame")
 	p.Name = name
-	p.Size = UDim2.new(1, 0, 1, 0)
+	if isPanel then
+		-- Side panel: right side, not fullscreen
+		p.Size = UDim2.new(0, 340, 1, -20)
+		p.Position = UDim2.new(1, -350, 0, 10)
+	else
+		p.Size = UDim2.new(1, 0, 1, 0)
+	end
 	p.CanvasSize = UDim2.new(0, 0, 0, 0)
-	p.AutomaticCanvasSize = Enum.AutomaticCanvasSize.Y
+	p.AutomaticCanvasSize = Enum.AutomaticSize.Y
 	p.ScrollBarThickness = 3
 	p.ScrollBarImageColor3 = ACCENT
 	p.BackgroundColor3 = BG
+	p.BackgroundTransparency = if isPanel then 0.05 else 0
 	p.BorderSizePixel = 0
 	p.Visible = false
-	pad(p, 16, 16, 16, 16)
+	pad(p, 12, 12, 12, 12)
 	listLayout(p, 10)
+	if isPanel then
+		corner(p, 10)
+		stroke(p, BORDER, 1, 0.3)
+	end
 	p.Parent = gui
 	return p
 end
@@ -281,12 +292,11 @@ spacer2.BackgroundTransparency = 1
 spacer2.Parent = introContent
 
 local introCard = card(introContent, true)
-label(introCard, "Every planet in this game uses real NASA data from the NSSDC Planetary Fact Sheets.", 13, TEXT_DIM)
-label(introCard, "Surface temperature, atmospheric pressure, gravity, composition. Nothing is made up.", 13, TEXT_DIM)
+label(introCard, "Eight planets. Real NASA surface data. One suit between you and all of it.", 13, TEXT_DIM)
 divider(introCard)
-label(introCard, "Collect materials scattered around the yard. Stack them as layers on your suit. Each material has real thermal conductivity, yield strength, density, and melting point.", 13, TEXT_DIM)
+label(introCard, "Scavenge materials. Layer them however you want. The physics will tell you if it works.", 13, TEXT_DIM)
 divider(introCard)
-label(introCard, "Then pick a planet and survive 20 minutes.", 14, TEXT_WHITE, FONT_TITLE)
+label(introCard, "Reach the beacon before your suit gives out.", 14, TEXT_WHITE, FONT_TITLE)
 
 local startBtn = btn(introContent, "Start", true)
 startBtn.Size = UDim2.new(1, 0, 0, 48)
@@ -308,14 +318,14 @@ local objCard = card(noteContent, true)
 label(objCard, "1. Walk to glowing material piles and press E to collect.", 13, TEXT_WHITE)
 label(objCard, "2. Open the workshop to build your suit layer by layer.", 13, TEXT_WHITE)
 label(objCard, "3. Pick a planet, choose a side (hot or cold), and deploy.", 13, TEXT_WHITE)
-label(objCard, "4. Survive 20 real-time minutes using only what you built.", 13, TEXT_WHITE)
+label(objCard, "4. Run the obby and reach the beacon before your suit fails.", 13, TEXT_WHITE)
 
 local hintLabel = label(noteContent, "", 12, WARNING, FONT_MONO)
 
 local openBuild = btn(noteContent, "Open Workshop", true)
 
 -- ── Workshop ────────────────────────────────────────────────────────────
-local workshop = page("Workshop")
+local workshop = page("Workshop", true)
 
 local function designFrom(d)
 	if d == nil then return Design.emptyDesign() end
@@ -587,6 +597,7 @@ function renderWorkshop()
 	local toPlanets = btn(workshop, "Choose destination", true)
 	toPlanets.Size = UDim2.new(1, 0, 0, 44)
 	toPlanets.MouseButton1Click:Connect(function()
+		warn("[CODAG Client] Choose destination clicked, state =", state ~= nil)
 		show(planets)
 		renderPlanets()
 	end)
@@ -600,7 +611,7 @@ openBuild.MouseButton1Click:Connect(function()
 end)
 
 -- ── Planets ─────────────────────────────────────────────────────────────
-local planets = page("Planets")
+local planets = page("Planets", true)
 
 local DEMO_MODE = true
 
@@ -622,11 +633,16 @@ local function isOpen(planetId: string): boolean
 end
 
 function renderPlanets()
+	warn("[CODAG Client] renderPlanets called, state =", state ~= nil)
 	clear(planets)
 
-	if state == nil then return end
+	if state == nil then
+		warn("[CODAG Client] renderPlanets: state is nil, aborting")
+		return
+	end
 
 	local design = designFrom(state.design)
+	warn("[CODAG Client] renderPlanets: design layers =", #design.layers, "planets =", #Sources.DESTINATION_ORDER)
 	local check = 1.5
 
 	label(planets, "DESTINATIONS", 11, ACCENT, FONT_TITLE)
@@ -679,8 +695,16 @@ function renderPlanets()
 		if open then
 			label(planetCard, string.format("Gravity: %.2f m/s2  |  %s", planet.gravityMs2, planet.role), 11, ACCENT, FONT_MONO)
 
-			local hotResult = Survival.kidResult(design, planet, check, "hot")
-			local coldResult = Survival.kidResult(design, planet, check, "cold")
+			local hotOk, hotResult = pcall(Survival.kidResult, design, planet, check, "hot")
+			if not hotOk then
+				warn("[CODAG Client] kidResult HOT error for", planetId, ":", hotResult)
+				hotResult = "Hot side: error"
+			end
+			local coldOk, coldResult = pcall(Survival.kidResult, design, planet, check, "cold")
+			if not coldOk then
+				warn("[CODAG Client] kidResult COLD error for", planetId, ":", coldResult)
+				coldResult = "Cold side: error"
+			end
 			label(planetCard, hotResult, 10, TEXT_DIM, FONT_MONO)
 			label(planetCard, coldResult, 10, TEXT_DIM, FONT_MONO)
 
@@ -697,6 +721,7 @@ function renderPlanets()
 		end
 	end
 
+	warn("[CODAG Client] renderPlanets: finished rendering all planets")
 	divider(planets)
 
 	local back = btn(planets, "Back to workshop", false)
@@ -707,7 +732,7 @@ function renderPlanets()
 end
 
 -- ── Difficulty / Briefing ───────────────────────────────────────────────
-local difficulty = page("Difficulty")
+local difficulty = page("Difficulty", true)
 
 function renderDifficulty()
 	clear(difficulty)
@@ -806,7 +831,7 @@ hud.Parent = gui
 local hudTitle = label(hud, "MISSION", 10, ACCENT, FONT_TITLE)
 local hudPlanet = label(hud, "", 16, TEXT_WHITE, FONT_TITLE)
 local hudSide = label(hud, "", 11, TEXT_DIM, FONT_MONO)
-local hudClock = label(hud, "0:00 / 20:00", 18, TEXT_WHITE, FONT_MONO)
+local hudClock = label(hud, "0:00", 18, TEXT_WHITE, FONT_MONO)
 hudClock.TextXAlignment = Enum.TextXAlignment.Center
 
 local _, airFill = meter(hud, "AIR SEAL", 100, 100, ACCENT)
@@ -848,7 +873,7 @@ local function renderHud()
 
 	hudPlanet.Text = player:GetAttribute("MissionPlanet") or ""
 	hudSide.Text = (player:GetAttribute("MissionSide") or "") .. "  |  " .. (player:GetAttribute("MissionDifficulty") or "")
-	hudClock.Text = clock(player:GetAttribute("MissionClock") or 0) .. " / 20:00"
+	hudClock.Text = clock(player:GetAttribute("MissionClock") or 0)
 
 	local airHeld = player:GetAttribute("AirHeld") or 100
 	airFill.Size = UDim2.new(math.clamp(airHeld / 100, 0, 1), 0, 1, 0)
