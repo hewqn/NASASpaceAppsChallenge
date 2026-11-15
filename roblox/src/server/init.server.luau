@@ -102,7 +102,10 @@ local function gravityFor(planetId: string): number
 	return Physics.gravityStuds(Catalog.planetById(planetId).gravityMs2, earthG)
 end
 
+local DEMO_MODE = true -- hackathon: all planets open
+
 local function unlocked(session, planetId: string): boolean
+	if DEMO_MODE then return true end
 	local previous = nil
 	for _, id in Sources.DESTINATION_ORDER do
 		if id == planetId then
