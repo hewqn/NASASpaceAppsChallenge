@@ -6,7 +6,7 @@ A Roblox game where players design survival suits from real engineering material
 
 ## What It Does
 
-You start in a space station orbiting Earth. Around you are storage racks holding 13 real materials: metals like aluminum and titanium, insulators like aerogel and Mylar, and an oxygen tank. You pick them up and layer them onto a suit in any order you choose, at four thickness options (thin, medium, thick, heavy). Then you choose a destination -- the Moon, Mars, Mercury, Venus, Jupiter, Saturn, Uranus, or Neptune -- and the game simulates whether your suit keeps you alive for 20 minutes.
+You start with a station on Earth. Around you are storage racks holding 13 real materials: metals like aluminum and titanium, insulators like aerogel and Mylar, and an oxygen tank. You pick them up and layer them onto a suit in any order you choose, at four thickness options (thin, medium, thick, heavy). Then you choose a destination -- the Moon, Mars, Mercury, Venus, Jupiter, Saturn, Uranus, or Neptune -- and the game simulates whether your suit keeps you alive for 20 minutes.
 
 The simulation checks:
 
