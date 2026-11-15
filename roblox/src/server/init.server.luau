@@ -61,6 +61,44 @@ local function applyLook(planetId: string)
 	Lighting.FogColor = look.sky
 	Lighting.FogStart = if planetId == "earth" then 400 else 40
 	Lighting.FogEnd = if planetId == "earth" then 900 else 180
+
+	-- Apply per-planet Atmosphere
+	local atmoConfig = world.atmo[planetId] or world.atmo.earth
+	local atmoInst = world.atmoInstance
+	if atmoInst then
+		atmoInst.Density = atmoConfig.density
+		atmoInst.Offset = atmoConfig.offset
+		atmoInst.Haze = atmoConfig.haze
+		atmoInst.Glare = atmoConfig.glare
+		atmoInst.Color = atmoConfig.color
+		atmoInst.Decay = atmoConfig.decay
+	end
+
+	-- Adjust bloom for airless worlds (brighter, harsher light)
+	local bloom = Lighting:FindFirstChild("CODAGBloom")
+	if bloom then
+		local airless = planetId == "moon" or planetId == "mercury"
+		bloom.Intensity = if airless then 0.6 else 0.4
+		bloom.Threshold = if airless then 0.8 else 0.9
+	end
+
+	-- Color correction per planet mood
+	local cc = Lighting:FindFirstChild("CODAGColor")
+	if cc then
+		if planetId == "venus" then
+			cc.TintColor = Color3.fromRGB(255, 230, 180)
+			cc.Saturation = 0.15
+		elseif planetId == "mars" then
+			cc.TintColor = Color3.fromRGB(255, 220, 200)
+			cc.Saturation = 0.1
+		elseif planetId == "neptune" or planetId == "uranus" then
+			cc.TintColor = Color3.fromRGB(220, 235, 255)
+			cc.Saturation = 0.05
+		else
+			cc.TintColor = Color3.fromRGB(255, 248, 240)
+			cc.Saturation = 0.08
+		end
+	end
 end
 
 local function gravityFor(planetId: string): number

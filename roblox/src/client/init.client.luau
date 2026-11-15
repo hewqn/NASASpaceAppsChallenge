@@ -20,15 +20,33 @@ local Abort = event("Abort")
 local State = event("State")
 local Debrief = event("Debrief")
 
-local INK = Color3.fromRGB(20, 17, 14)
-local PAPER = Color3.fromRGB(244, 239, 230)
-local AMBER = Color3.fromRGB(224, 160, 69)
-local PANEL = Color3.fromRGB(34, 28, 22)
+-- ── Design tokens ────────────────────────────────────────────────────────
+
+local INK      = Color3.fromRGB(18, 15, 12)
+local INK_MID  = Color3.fromRGB(30, 26, 21)
+local PAPER    = Color3.fromRGB(244, 239, 230)
+local PAPER_DIM= Color3.fromRGB(190, 180, 165)
+local AMBER    = Color3.fromRGB(224, 160, 69)
+local AMBER_DIM= Color3.fromRGB(180, 130, 55)
+local RED      = Color3.fromRGB(210, 90, 70)
+local GREEN    = Color3.fromRGB(90, 180, 100)
+local PANEL    = Color3.fromRGB(38, 32, 26)
+local PANEL_HI = Color3.fromRGB(52, 44, 36)
+
+local FONT_TITLE = Enum.Font.GothamBlack
+local FONT_BOLD  = Enum.Font.GothamBold
+local FONT_BODY  = Enum.Font.Gotham
+local FONT_MONO  = Enum.Font.Code
+
+-- ── ScreenGui ────────────────────────────────────────────────────────────
 
 local gui = Instance.new("ScreenGui")
 gui.Name = "CODAG"
 gui.ResetOnSpawn = false
+gui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
 gui.Parent = player:WaitForChild("PlayerGui")
+
+-- ── UI helpers ───────────────────────────────────────────────────────────
 
 local function corner(parent: Instance, radius: number)
 	local ui = Instance.new("UICorner")
@@ -36,10 +54,34 @@ local function corner(parent: Instance, radius: number)
 	ui.Parent = parent
 end
 
-local function label(parent: Instance, text: string, size: number, color: Color3): TextLabel
+local function stroke(parent: Instance, color: Color3, thickness: number)
+	local ui = Instance.new("UIStroke")
+	ui.Color = color
+	ui.Thickness = thickness
+	ui.Transparency = 0.6
+	ui.Parent = parent
+end
+
+local function padding(parent: Instance, top: number, bottom: number, left: number, right: number)
+	local ui = Instance.new("UIPadding")
+	ui.PaddingTop = UDim.new(0, top)
+	ui.PaddingBottom = UDim.new(0, bottom)
+	ui.PaddingLeft = UDim.new(0, left)
+	ui.PaddingRight = UDim.new(0, right)
+	ui.Parent = parent
+end
+
+local function listLayout(parent: Instance, gap: number, order: Enum.SortOrder?)
+	local layout = Instance.new("UIListLayout")
+	layout.Padding = UDim.new(0, gap)
+	layout.SortOrder = order or Enum.SortOrder.LayoutOrder
+	layout.Parent = parent
+end
+
+local function label(parent: Instance, text: string, size: number, color: Color3, font: Enum.Font?): TextLabel
 	local item = Instance.new("TextLabel")
 	item.BackgroundTransparency = 1
-	item.Font = Enum.Font.Gotham
+	item.Font = font or FONT_BODY
 	item.TextSize = size
 	item.TextColor3 = color
 	item.TextXAlignment = Enum.TextXAlignment.Left
@@ -51,13 +93,39 @@ local function label(parent: Instance, text: string, size: number, color: Color3
 	return item
 end
 
+local function divider(parent: Instance)
+	local line = Instance.new("Frame")
+	line.BackgroundColor3 = PAPER_DIM
+	line.BackgroundTransparency = 0.8
+	line.BorderSizePixel = 0
+	line.Size = UDim2.new(1, 0, 0, 1)
+	line.Parent = parent
+end
+
 local function button(parent: Instance, text: string, primary: boolean): TextButton
 	local item = Instance.new("TextButton")
-	item.Size = UDim2.new(1, 0, 0, 44)
+	item.Size = UDim2.new(1, 0, 0, 48)
 	item.BackgroundColor3 = if primary then AMBER else PANEL
 	item.TextColor3 = if primary then INK else PAPER
-	item.Font = Enum.Font.GothamBold
+	item.Font = FONT_BOLD
 	item.TextSize = 16
+	item.Text = text
+	item.AutoButtonColor = true
+	item.Parent = parent
+	corner(item, 12)
+	if not primary then
+		stroke(item, PAPER_DIM, 1)
+	end
+	return item
+end
+
+local function smallButton(parent: Instance, text: string, color: Color3): TextButton
+	local item = Instance.new("TextButton")
+	item.Size = UDim2.new(0.48, 0, 0, 38)
+	item.BackgroundColor3 = color
+	item.TextColor3 = INK
+	item.Font = FONT_BOLD
+	item.TextSize = 14
 	item.Text = text
 	item.AutoButtonColor = true
 	item.Parent = parent
@@ -65,49 +133,84 @@ local function button(parent: Instance, text: string, primary: boolean): TextBut
 	return item
 end
 
+local function card(parent: Instance, color: Color3?): Frame
+	local frame = Instance.new("Frame")
+	frame.BackgroundColor3 = color or INK_MID
+	frame.BorderSizePixel = 0
+	frame.Size = UDim2.new(1, 0, 0, 0)
+	frame.AutomaticSize = Enum.AutomaticSize.Y
+	frame.Parent = parent
+	corner(frame, 10)
+	padding(frame, 10, 10, 10, 10)
+	listLayout(frame, 4)
+	return frame
+end
+
+-- ── Meter bar ────────────────────────────────────────────────────────────
+
+local function meter(parent: Instance, labelText: string, pct: number, barColor: Color3): Frame
+	local row = Instance.new("Frame")
+	row.BackgroundTransparency = 1
+	row.Size = UDim2.new(1, 0, 0, 32)
+	row.Parent = parent
+
+	label(row, labelText, 13, PAPER_DIM, FONT_MONO).Position = UDim2.new(0, 0, 0, 0)
+
+	local track = Instance.new("Frame")
+	track.BackgroundColor3 = PANEL
+	track.BorderSizePixel = 0
+	track.Size = UDim2.new(1, 0, 0, 8)
+	track.Position = UDim2.new(0, 0, 0, 22)
+	track.Parent = row
+	corner(track, 4)
+
+	local fill = Instance.new("Frame")
+	fill.BackgroundColor3 = barColor
+	fill.BorderSizePixel = 0
+	fill.Size = UDim2.new(math.clamp(pct / 100, 0, 1), 0, 1, 0)
+	fill.Parent = track
+	corner(fill, 4)
+
+	return row
+end
+
+-- ── Panels ───────────────────────────────────────────────────────────────
+
 local function page(name: string): ScrollingFrame
 	local frame = Instance.new("ScrollingFrame")
 	frame.Name = name
 	frame.Visible = false
-	frame.Size = UDim2.fromOffset(420, 560)
+	frame.Size = UDim2.fromOffset(440, 580)
 	frame.Position = UDim2.new(0, 16, 0, 16)
 	frame.BackgroundColor3 = INK
+	frame.BackgroundTransparency = 0.05
 	frame.BorderSizePixel = 0
-	frame.ScrollBarThickness = 6
+	frame.ScrollBarThickness = 4
+	frame.ScrollBarImageColor3 = AMBER_DIM
 	frame.AutomaticCanvasSize = Enum.AutomaticSize.Y
 	frame.CanvasSize = UDim2.new()
 	frame.Parent = gui
-	corner(frame, 16)
-	local layout = Instance.new("UIListLayout")
-	layout.Padding = UDim.new(0, 8)
-	layout.SortOrder = Enum.SortOrder.LayoutOrder
-	layout.Parent = frame
-	local pad = Instance.new("UIPadding")
-	pad.PaddingTop = UDim.new(0, 14)
-	pad.PaddingBottom = UDim.new(0, 14)
-	pad.PaddingLeft = UDim.new(0, 14)
-	pad.PaddingRight = UDim.new(0, 14)
-	pad.Parent = frame
+	corner(frame, 18)
+	stroke(frame, AMBER_DIM, 1)
+	listLayout(frame, 10)
+	padding(frame, 16, 16, 16, 16)
 	return frame
 end
 
+-- Note (home panel)
 local note = Instance.new("Frame")
 note.Name = "Note"
-note.Size = UDim2.fromOffset(360, 120)
+note.Size = UDim2.fromOffset(380, 140)
 note.Position = UDim2.new(0, 16, 0, 16)
 note.BackgroundColor3 = INK
+note.BackgroundTransparency = 0.05
 note.Parent = gui
-corner(note, 16)
-local noteLayout = Instance.new("UIListLayout")
-noteLayout.Padding = UDim.new(0, 6)
-noteLayout.Parent = note
-local notePad = Instance.new("UIPadding")
-notePad.PaddingTop = UDim.new(0, 12)
-notePad.PaddingLeft = UDim.new(0, 12)
-notePad.PaddingRight = UDim.new(0, 12)
-notePad.Parent = note
-label(note, "CODAG.0", 14, AMBER)
-label(note, "Pick up a colored pile. Then drag it onto Shell, Wrap, or Air.", 16, PAPER)
+corner(note, 18)
+stroke(note, AMBER_DIM, 1)
+listLayout(note, 8)
+padding(note, 14, 14, 14, 14)
+label(note, "CODAG.0", 13, AMBER, FONT_TITLE)
+label(note, "Pick up a colored pile, then drag it onto Shell, Wrap, or Air.", 17, PAPER, FONT_BOLD)
 local openBuild = button(note, "Build the suit", true)
 
 local workshop = page("Workshop")
@@ -115,26 +218,26 @@ local planets = page("Planets")
 local difficulty = page("Difficulty")
 local debrief = page("Debrief")
 
+-- HUD (mission overlay)
 local hud = Instance.new("Frame")
 hud.Name = "Hud"
 hud.Visible = false
-hud.Size = UDim2.fromOffset(320, 220)
+hud.Size = UDim2.fromOffset(340, 0)
+hud.AutomaticSize = Enum.AutomaticSize.Y
 hud.Position = UDim2.new(0, 16, 0, 16)
 hud.BackgroundColor3 = INK
+hud.BackgroundTransparency = 0.1
 hud.Parent = gui
-corner(hud, 16)
-local hudLayout = Instance.new("UIListLayout")
-hudLayout.Padding = UDim.new(0, 6)
-hudLayout.Parent = hud
-local hudPad = Instance.new("UIPadding")
-hudPad.PaddingTop = UDim.new(0, 12)
-hudPad.PaddingLeft = UDim.new(0, 12)
-hudPad.PaddingRight = UDim.new(0, 12)
-hudPad.Parent = hud
+corner(hud, 18)
+stroke(hud, AMBER_DIM, 1)
+listLayout(hud, 6)
+padding(hud, 14, 14, 14, 14)
+
+-- ── Clear / show ─────────────────────────────────────────────────────────
 
 local function clear(frame: Instance)
 	for _, child in frame:GetChildren() do
-		if not child:IsA("UIListLayout") and not child:IsA("UIPadding") then
+		if not child:IsA("UIListLayout") and not child:IsA("UIPadding") and not child:IsA("UICorner") and not child:IsA("UIStroke") then
 			child:Destroy()
 		end
 	end
@@ -147,6 +250,8 @@ local function show(which: ScrollingFrame?)
 	debrief.Visible = which == debrief
 	note.Visible = which == nil and hud.Visible == false
 end
+
+-- ── State ────────────────────────────────────────────────────────────────
 
 local state = nil
 local chosenPlanet = nil
@@ -170,59 +275,130 @@ local function materialName(id: string): string
 	return Catalog.materialById(id).name
 end
 
+-- ── Workshop ─────────────────────────────────────────────────────────────
+
 local function renderWorkshop()
 	clear(workshop)
-	label(workshop, "CODAG.0", 14, AMBER)
-	label(workshop, "Drag what you found onto the suit.", 28, PAPER).Font = Enum.Font.GothamBold
-	label(workshop, "Shell holds your air in. Wrap slows the heat. Air is the bottles. You never type a size.", 16, Color3.fromRGB(217, 203, 182))
-	label(workshop, state.hint, 16, AMBER)
-	if state.problem ~= "" then
-		label(workshop, state.problem, 16, Color3.fromRGB(224, 122, 74))
+
+	-- Header
+	label(workshop, "CODAG.0", 13, AMBER, FONT_TITLE)
+	label(workshop, "Build the suit.", 26, PAPER, FONT_BOLD)
+	label(workshop, "Shell holds air in. Wrap slows the heat. Air is the bottles.\nYou never type a number. The mass comes from the physics.", 14, PAPER_DIM)
+
+	divider(workshop)
+
+	-- Status hint
+	if state.hint ~= "" then
+		local hintCard = card(workshop, PANEL)
+		label(hintCard, state.hint, 15, AMBER)
 	end
+	if state.problem ~= "" then
+		local probCard = card(workshop, Color3.fromRGB(50, 25, 20))
+		label(probCard, state.problem, 15, RED)
+	end
+
+	-- Inventory
+	label(workshop, "YOUR MATERIALS", 11, PAPER_DIM, FONT_BOLD)
+	local hasAny = false
 	for _, material in Catalog.MATERIALS do
 		if (state.inventory[material.id] or 0) > 0 then
-			local card = button(workshop, material.name, picked == material.id)
-			card.MouseButton1Click:Connect(function()
+			hasAny = true
+			local isPicked = picked == material.id
+			local matBtn = button(workshop, (if isPicked then "> " else "") .. material.name, isPicked)
+			matBtn.MouseButton1Click:Connect(function()
 				picked = material.id
 				renderWorkshop()
 			end)
 		end
 	end
+	if not hasAny then
+		label(workshop, "Walk around and pick up the piles first.", 14, PAPER_DIM)
+	end
+
+	divider(workshop)
+
+	-- Slots
+	label(workshop, "SUIT SLOTS", 11, PAPER_DIM, FONT_BOLD)
 	local design = designFrom(state.design)
 	local slots = {
-		{ id = "shell", title = "Shell", filled = materialName(design.shellMaterialId) },
-		{ id = "wrap", title = "Wrap", filled = materialName(design.insulationMaterialId) },
-		{ id = "air", title = "Air", filled = if design.oxygenKg > 0 then "Bottles packed" else "Empty" },
+		{ id = "shell", title = "Shell", filled = materialName(design.shellMaterialId), icon = "[=]" },
+		{ id = "wrap",  title = "Wrap",  filled = materialName(design.insulationMaterialId), icon = "{ }" },
+		{ id = "air",   title = "Air",   filled = if design.oxygenKg > 0 then string.format("%.1f kg packed", design.oxygenKg) else "Empty", icon = "(O)" },
 	}
 	for _, slot in slots do
-		local slotButton = button(workshop, slot.title .. "  ·  " .. slot.filled, false)
-		slotButton.MouseButton1Click:Connect(function()
+		local slotCard = card(workshop)
+		label(slotCard, slot.icon .. "  " .. slot.title, 16, PAPER, FONT_BOLD)
+		label(slotCard, slot.filled, 14, if slot.filled == "Empty" then PAPER_DIM else AMBER)
+		local slotBtn = button(slotCard, if picked then "Place here" else "Pick a material first", picked ~= nil)
+		slotBtn.Active = picked ~= nil
+		slotBtn.MouseButton1Click:Connect(function()
 			if picked ~= nil then
 				Place:FireServer(picked, slot.id)
 				picked = nil
 			end
 		end)
 		if slot.filled ~= "Empty" then
-			local off = button(workshop, "Take off " .. slot.title, false)
+			local off = Instance.new("TextButton")
+			off.Size = UDim2.new(1, 0, 0, 30)
+			off.BackgroundTransparency = 1
+			off.TextColor3 = RED
+			off.Font = FONT_BODY
+			off.TextSize = 13
+			off.Text = "Remove"
+			off.Parent = slotCard
 			off.MouseButton1Click:Connect(function()
 				ClearSlot:FireServer(slot.id)
 			end)
 		end
 	end
-	for _, size in { { "fits", "Fits me" }, { "bigger", "A bit bigger" }, { "bulky", "Big and heavy" } } do
-		local sizeButton = button(workshop, size[2], false)
+
+	divider(workshop)
+
+	-- Suit size
+	label(workshop, "SUIT SIZE", 11, PAPER_DIM, FONT_BOLD)
+	local sizeRow = Instance.new("Frame")
+	sizeRow.BackgroundTransparency = 1
+	sizeRow.Size = UDim2.new(1, 0, 0, 42)
+	sizeRow.Parent = workshop
+	local sizeLayout = Instance.new("UIListLayout")
+	sizeLayout.FillDirection = Enum.FillDirection.Horizontal
+	sizeLayout.Padding = UDim.new(0, 6)
+	sizeLayout.Parent = sizeRow
+	for _, size in { { "fits", "Fits me" }, { "bigger", "Bigger" }, { "bulky", "Heavy" } } do
+		local sizeButton = Instance.new("TextButton")
+		sizeButton.Size = UDim2.new(0.32, 0, 1, 0)
+		sizeButton.BackgroundColor3 = PANEL_HI
+		sizeButton.TextColor3 = PAPER
+		sizeButton.Font = FONT_BOLD
+		sizeButton.TextSize = 14
+		sizeButton.Text = size[2]
+		sizeButton.AutoButtonColor = true
+		sizeButton.Parent = sizeRow
+		corner(sizeButton, 8)
 		sizeButton.MouseButton1Click:Connect(function()
 			SetSize:FireServer(size[1])
 		end)
 	end
+
+	divider(workshop)
+
+	-- Preview
+	label(workshop, "PREVIEW", 11, PAPER_DIM, FONT_BOLD)
 	local check = Catalog.difficultyById("normal").minSafetyFactor
 	local moon = Catalog.planetById("moon")
-	label(workshop, "Same suit, Moon:", 16, PAPER)
-	label(workshop, Survival.kidResult(design, moon, check, "hot"), 16, PAPER)
-	label(workshop, Survival.kidResult(design, moon, check, "cold"), 16, PAPER)
+	local previewCard = card(workshop)
+	label(previewCard, "Moon test (Normal)", 14, PAPER, FONT_BOLD)
+	label(previewCard, Survival.kidResult(design, moon, check, "hot"), 13, PAPER_DIM)
+	label(previewCard, Survival.kidResult(design, moon, check, "cold"), 13, PAPER_DIM)
+
+	-- Go button
 	local go = button(workshop, "Try this suit on a planet", true)
 	go.Active = state.problem == ""
 	go.AutoButtonColor = state.problem == ""
+	if state.problem ~= "" then
+		go.BackgroundColor3 = PANEL
+		go.TextColor3 = PAPER_DIM
+	end
 	go.MouseButton1Click:Connect(function()
 		if state.problem == "" then
 			show(planets)
@@ -237,6 +413,8 @@ openBuild.MouseButton1Click:Connect(function()
 		renderWorkshop()
 	end
 end)
+
+-- ── Planets ──────────────────────────────────────────────────────────────
 
 local function isOpen(planetId: string): boolean
 	local previous = nil
@@ -255,57 +433,98 @@ end
 
 function renderPlanets()
 	clear(planets)
-	label(planets, "Same suit. Different planet.", 28, PAPER).Font = Enum.Font.GothamBold
-	label(planets, "The line under each name is what this suit would do there. The planet numbers do not change.", 16, Color3.fromRGB(217, 203, 182))
+
+	label(planets, "CODAG.0", 13, AMBER, FONT_TITLE)
+	label(planets, "Same suit.\nDifferent planet.", 26, PAPER, FONT_BOLD)
+	label(planets, "The planet numbers are from NASA fact sheets. They do not change.", 14, PAPER_DIM)
+
+	divider(planets)
+
 	local design = designFrom(state.design)
 	local check = Catalog.difficultyById("normal").minSafetyFactor
 	for _, planetId in Sources.DESTINATION_ORDER do
 		local planet = Catalog.planetById(planetId)
 		local open = isOpen(planetId)
-		label(planets, planet.name, 20, PAPER).Font = Enum.Font.GothamBold
-		label(planets, Survival.kidResult(design, planet, check, "hot"), 16, PAPER)
-		local choose = button(planets, if open then "Select" else "Locked", open)
-		choose.Active = open
-		choose.MouseButton1Click:Connect(function()
-			if open then
+
+		local planetCard = card(planets, if open then INK_MID else PANEL)
+		label(planetCard, planet.name, 20, if open then PAPER else PAPER_DIM, FONT_BOLD)
+		label(planetCard, string.format("g = %.2f m/s²", planet.gravityMs2), 12, AMBER, FONT_MONO)
+		label(planetCard, Survival.kidResult(design, planet, check, "hot"), 13, PAPER_DIM)
+
+		if open then
+			local choose = button(planetCard, "Select", true)
+			choose.MouseButton1Click:Connect(function()
 				chosenPlanet = planetId
 				show(difficulty)
 				renderDifficulty()
-			end
-		end)
+			end)
+		else
+			label(planetCard, "Locked. Clear the previous planet first.", 12, PAPER_DIM)
+		end
 	end
+
+	divider(planets)
+
 	local back = button(planets, "Back to the suit", false)
 	back.MouseButton1Click:Connect(function()
 		show(workshop)
+		renderWorkshop()
 	end)
 end
+
+-- ── Difficulty ───────────────────────────────────────────────────────────
 
 function renderDifficulty()
 	clear(difficulty)
 	local planet = Catalog.planetById(chosenPlanet)
-	label(difficulty, planet.name, 28, PAPER).Font = Enum.Font.GothamBold
-	label(difficulty, planet.referencePressure.transcribedFrom, 16, Color3.fromRGB(217, 203, 182))
-	label(difficulty, "Difficulty changes the rules, not the planet.", 16, PAPER)
+
+	label(difficulty, "CODAG.0", 13, AMBER, FONT_TITLE)
+	label(difficulty, planet.name, 28, PAPER, FONT_BOLD)
+	label(difficulty, planet.referencePressure.transcribedFrom, 13, PAPER_DIM)
+
+	divider(difficulty)
+
+	label(difficulty, "Difficulty changes the rules, not the planet.", 15, PAPER)
+
 	for _, profile in Catalog.DIFFICULTIES do
-		local pick = button(difficulty, profile.label, profile.id == "normal")
+		local diffCard = card(difficulty)
+		label(diffCard, profile.label, 18, PAPER, FONT_BOLD)
+		local pick = button(diffCard, "Choose " .. profile.label, profile.id == "normal")
 		pick.MouseButton1Click:Connect(function()
 			clear(difficulty)
-			label(difficulty, planet.name .. " · " .. profile.label, 28, PAPER).Font = Enum.Font.GothamBold
+			label(difficulty, planet.name, 28, PAPER, FONT_BOLD)
+			label(difficulty, profile.label .. " difficulty", 14, AMBER)
+
+			divider(difficulty)
+
 			local hot = Survival.exposure(planet, "hot")
 			local cold = Survival.exposure(planet, "cold")
-			local hotButton = button(difficulty, string.format("Hot side, %.0f °C", Survival.celsius(hot.kelvin)), true)
-			local coldButton = button(difficulty, string.format("Cold side, %.0f °C", Survival.celsius(cold.kelvin)), true)
-			hotButton.MouseButton1Click:Connect(function()
+
+			label(difficulty, "CHOOSE A SIDE", 11, PAPER_DIM, FONT_BOLD)
+
+			local hotCard = card(difficulty, Color3.fromRGB(50, 30, 20))
+			label(hotCard, string.format("Hot side   %.0f °C", Survival.celsius(hot.kelvin)), 18, AMBER, FONT_BOLD)
+			label(hotCard, hot.transcribedFrom, 12, PAPER_DIM)
+			local hotBtn = button(hotCard, "Land on the hot side", true)
+			hotBtn.MouseButton1Click:Connect(function()
 				Depart:FireServer(planet.id, profile.id, "hot")
 				show(nil)
 			end)
-			coldButton.MouseButton1Click:Connect(function()
+
+			local coldCard = card(difficulty, Color3.fromRGB(20, 30, 50))
+			label(coldCard, string.format("Cold side   %.0f °C", Survival.celsius(cold.kelvin)), 18, Color3.fromRGB(140, 180, 220), FONT_BOLD)
+			label(coldCard, cold.transcribedFrom, 12, PAPER_DIM)
+			local coldBtn = button(coldCard, "Land on the cold side", true)
+			coldBtn.BackgroundColor3 = Color3.fromRGB(100, 160, 200)
+			coldBtn.MouseButton1Click:Connect(function()
 				Depart:FireServer(planet.id, profile.id, "cold")
 				show(nil)
 			end)
-			label(difficulty, hot.transcribedFrom, 14, Color3.fromRGB(217, 203, 182))
 		end)
 	end
+
+	divider(difficulty)
+
 	local back = button(difficulty, "Back", false)
 	back.MouseButton1Click:Connect(function()
 		show(planets)
@@ -313,18 +532,37 @@ function renderDifficulty()
 	end)
 end
 
-local hudTitle = label(hud, "CODAG.0", 14, AMBER)
-local hudClock = label(hud, "0:00 / 20:00", 28, PAPER)
-hudClock.Font = Enum.Font.GothamBold
-local hudAir = label(hud, "Air held in", 16, PAPER)
-local hudCore = label(hud, "Core 37 °C", 16, PAPER)
-local hudOxygen = label(hud, "Oxygen", 16, PAPER)
-local hudDeath = label(hud, "", 18, Color3.fromRGB(224, 122, 74))
+-- ── HUD (mission) ────────────────────────────────────────────────────────
+
+local hudTitle = label(hud, "CODAG.0", 12, AMBER, FONT_TITLE)
+local hudPlanet = label(hud, "", 22, PAPER, FONT_BOLD)
+local hudClock = label(hud, "0:00 / 20:00", 24, PAPER, FONT_MONO)
+local hudAirHolder = Instance.new("Frame")
+hudAirHolder.BackgroundTransparency = 1
+hudAirHolder.Size = UDim2.new(1, 0, 0, 32)
+hudAirHolder.Parent = hud
+local hudCoreHolder = Instance.new("Frame")
+hudCoreHolder.BackgroundTransparency = 1
+hudCoreHolder.Size = UDim2.new(1, 0, 0, 32)
+hudCoreHolder.Parent = hud
+local hudOxygenHolder = Instance.new("Frame")
+hudOxygenHolder.BackgroundTransparency = 1
+hudOxygenHolder.Size = UDim2.new(1, 0, 0, 32)
+hudOxygenHolder.Parent = hud
+local hudDeath = label(hud, "", 16, RED, FONT_BOLD)
 local died = button(hud, "You died", true)
 died.Visible = false
 died.MouseButton1Click:Connect(function()
 	hud.Visible = false
 	debrief.Visible = true
+end)
+local abortBtn = button(hud, "Abort mission", false)
+abortBtn.BackgroundColor3 = Color3.fromRGB(60, 30, 25)
+abortBtn.TextColor3 = RED
+abortBtn.MouseButton1Click:Connect(function()
+	Abort:FireServer()
+	show(workshop)
+	if state then renderWorkshop() end
 end)
 
 local function clock(seconds: number): string
@@ -335,6 +573,7 @@ end
 local function renderHud()
 	local inMission = player:GetAttribute("InMission") == true
 	hud.Visible = inMission
+	abortBtn.Visible = inMission
 	if inMission then
 		note.Visible = false
 	end
@@ -345,17 +584,42 @@ local function renderHud()
 	local planetName = player:GetAttribute("MissionPlanet") or ""
 	local side = player:GetAttribute("MissionSide") or ""
 	local mode = player:GetAttribute("MissionDifficulty") or ""
-	hudTitle.Text = string.upper(planetName) .. " · " .. string.upper(side) .. " · " .. string.upper(mode)
+	hudPlanet.Text = planetName
+	hudTitle.Text = string.upper(side) .. " SIDE  ·  " .. string.upper(mode)
 	hudClock.Text = clock(player:GetAttribute("MissionClock") or 0) .. " / 20:00"
+
+	-- Air held meter
 	local held = player:GetAttribute("AirHeld") or 100
-	hudAir.Text = if held >= 100 then "Air held in. The shell is closed." else string.format("Air held in  %.0f%%. No shell. The air is leaving.", held)
-	hudCore.Text = string.format("Core  %.1f °C", player:GetAttribute("CoreC") or 37)
-	hudOxygen.Text = string.format("Oxygen  %.3f kg", player:GetAttribute("OxygenKg") or 0)
+	for _, child in hudAirHolder:GetChildren() do child:Destroy() end
+	meter(hudAirHolder,
+		if held >= 100 then "AIR SEALED" else string.format("AIR LEAKING  %.0f%%", held),
+		held,
+		if held >= 100 then GREEN else AMBER)
+
+	-- Core temp meter
+	local coreC = player:GetAttribute("CoreC") or 37
+	local corePct = math.clamp(((coreC - 30) / 15) * 100, 0, 100)
+	for _, child in hudCoreHolder:GetChildren() do child:Destroy() end
+	meter(hudCoreHolder,
+		string.format("CORE  %.1f °C", coreC),
+		corePct,
+		if coreC < 35 or coreC > 40 then RED else GREEN)
+
+	-- Oxygen meter
+	local oxyKg = player:GetAttribute("OxygenKg") or 0
+	local oxyPct = math.clamp(oxyKg / 2 * 100, 0, 100)
+	for _, child in hudOxygenHolder:GetChildren() do child:Destroy() end
+	meter(hudOxygenHolder,
+		string.format("O₂  %.3f kg", oxyKg),
+		oxyPct,
+		if oxyPct < 20 then RED else GREEN)
+
 	local alive = player:GetAttribute("Alive") ~= false
 	local cause = player:GetAttribute("CauseTitle") or ""
 	hudDeath.Text = if alive then "" else cause
 	died.Visible = not alive
 	died.Text = if alive then "You held on" else "You died"
+	abortBtn.Visible = alive
 end
 
 player:GetAttributeChangedSignal("MissionClock"):Connect(renderHud)
@@ -363,6 +627,8 @@ player:GetAttributeChangedSignal("InMission"):Connect(renderHud)
 player:GetAttributeChangedSignal("Alive"):Connect(renderHud)
 player:GetAttributeChangedSignal("CoreC"):Connect(renderHud)
 player:GetAttributeChangedSignal("AirHeld"):Connect(renderHud)
+
+-- ── State sync ───────────────────────────────────────────────────────────
 
 State.OnClientEvent:Connect(function(nextState)
 	state = nextState
@@ -374,30 +640,50 @@ State.OnClientEvent:Connect(function(nextState)
 	end
 end)
 
+-- ── Debrief ──────────────────────────────────────────────────────────────
+
 Debrief.OnClientEvent:Connect(function(report)
 	clear(debrief)
 	hud.Visible = false
 	show(debrief)
-	label(debrief, if report.survived then "You survived" else "You died", 14, AMBER)
-	label(debrief, report.title, 28, PAPER).Font = Enum.Font.GothamBold
-	label(debrief, report.detail, 16, PAPER)
-	label(debrief, "Looked up for this result", 20, PAPER).Font = Enum.Font.GothamBold
-	label(debrief, "These lines were retrieved from the fact sheets. The physics check decided pass or fail. No model filled in a number.", 14, Color3.fromRGB(217, 203, 182))
-	for _, fact in report.facts do
-		label(debrief, fact.text, 15, PAPER)
-		label(debrief, fact.body .. " fact sheet", 13, AMBER)
-		label(debrief, fact.sourceUrl, 12, Color3.fromRGB(240, 194, 122))
+
+	label(debrief, "CODAG.0", 13, AMBER, FONT_TITLE)
+
+	if report.survived then
+		label(debrief, "You survived.", 28, GREEN, FONT_BOLD)
+	else
+		label(debrief, "You died.", 28, RED, FONT_BOLD)
 	end
-	local again = button(debrief, "Try again", false)
+
+	label(debrief, report.title, 18, PAPER, FONT_BOLD)
+	label(debrief, report.detail, 15, PAPER_DIM)
+
+	divider(debrief)
+
+	label(debrief, "NASA FACT SHEET DATA", 11, AMBER, FONT_BOLD)
+	label(debrief, "These lines were retrieved from the fact sheets. The physics decided pass or fail. No model filled in a number.", 13, PAPER_DIM)
+
+	for _, fact in report.facts do
+		local factCard = card(debrief)
+		label(factCard, fact.text, 14, PAPER)
+		label(factCard, fact.body .. " Fact Sheet", 12, AMBER, FONT_BOLD)
+		label(factCard, fact.sourceUrl, 11, AMBER_DIM, FONT_MONO)
+	end
+
+	divider(debrief)
+
+	local again = button(debrief, "Try again with same suit", false)
 	again.MouseButton1Click:Connect(function()
 		show(difficulty)
 		renderDifficulty()
 	end)
+
 	local suit = button(debrief, "Change the suit", false)
 	suit.MouseButton1Click:Connect(function()
 		show(workshop)
 		renderWorkshop()
 	end)
+
 	local earth = button(debrief, "Back to Earth", true)
 	earth.MouseButton1Click:Connect(function()
 		Abort:FireServer()
@@ -405,6 +691,8 @@ Debrief.OnClientEvent:Connect(function(report)
 		renderWorkshop()
 	end)
 end)
+
+-- ── Init ─────────────────────────────────────────────────────────────────
 
 show(nil)
 event("Ready"):FireServer()
