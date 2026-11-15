@@ -272,7 +272,8 @@ local introContent = Instance.new("Frame")
 introContent.Size = UDim2.new(1, 0, 0, 0)
 introContent.AutomaticSize = Enum.AutomaticSize.Y
 introContent.BackgroundTransparency = 1
-listLayout(introContent, 16)
+local introListLayout = listLayout(introContent, 16)
+introListLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center
 introContent.Parent = intro
 
 local spacer1 = Instance.new("Frame")
@@ -280,8 +281,15 @@ spacer1.Size = UDim2.new(1, 0, 0, 60)
 spacer1.BackgroundTransparency = 1
 spacer1.Parent = introContent
 
-local introTitle = label(introContent, "CODAG.0", 48, ACCENT, FONT_DISPLAY)
-introTitle.TextXAlignment = Enum.TextXAlignment.Center
+local introLogo = Instance.new("ImageLabel")
+introLogo.Size = UDim2.new(0, 200, 0, 200)
+introLogo.BackgroundTransparency = 1
+introLogo.Image = "rbxassetid://135974007304660"
+introLogo.ScaleType = Enum.ScaleType.Fit
+introLogo.Parent = introContent
+local introLogoLayout = Instance.new("UIAspectRatioConstraint")
+introLogoLayout.AspectRatio = 1
+introLogoLayout.Parent = introLogo
 
 local introSub = label(introContent, "BUILD YOUR SURVIVAL SUIT. FACE THE SOLAR SYSTEM.", 14, TEXT_DIM, FONT_TITLE)
 introSub.TextXAlignment = Enum.TextXAlignment.Center
@@ -952,12 +960,12 @@ end)
 -- ── Init ────────────────────────────────────────────────────────────────
 local function showIntro()
 	show(intro)
-	introTitle.TextTransparency = 1
+	introLogo.ImageTransparency = 1
 	introSub.TextTransparency = 1
 	startBtn.Visible = false
 
 	task.delay(0.3, function()
-		TweenService:Create(introTitle, TweenInfo.new(0.8, Enum.EasingStyle.Quad), {TextTransparency = 0}):Play()
+		TweenService:Create(introLogo, TweenInfo.new(0.8, Enum.EasingStyle.Quad), {ImageTransparency = 0}):Play()
 	end)
 	task.delay(0.8, function()
 		TweenService:Create(introSub, TweenInfo.new(0.6, Enum.EasingStyle.Quad), {TextTransparency = 0}):Play()
