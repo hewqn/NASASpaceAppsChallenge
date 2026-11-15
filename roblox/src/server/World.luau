@@ -8,8 +8,8 @@ local Catalog = require(ReplicatedStorage:WaitForChild("CODAG").Data.Catalog)
 
 local LOOK = {
 	earth   = { ground = Color3.fromRGB(111, 143,  98), sky = Color3.fromRGB(135, 175, 210), clock = 14 },
-	moon    = { ground = Color3.fromRGB(160, 155, 148), sky = Color3.fromRGB(  4,   4,   8), clock =  0 },
-	mercury = { ground = Color3.fromRGB(140, 130, 118), sky = Color3.fromRGB( 10,   8,   6), clock =  0 },
+	moon    = { ground = Color3.fromRGB(160, 155, 148), sky = Color3.fromRGB(  4,   4,   8), clock = 14 },
+	mercury = { ground = Color3.fromRGB(140, 130, 118), sky = Color3.fromRGB( 10,   8,   6), clock = 14 },
 	venus   = { ground = Color3.fromRGB(180, 130,  60), sky = Color3.fromRGB(160, 110,  40), clock = 12 },
 	mars    = { ground = Color3.fromRGB(170,  90,  55), sky = Color3.fromRGB(180, 120,  80), clock = 10 },
 	jupiter = { ground = Color3.fromRGB(190, 165, 120), sky = Color3.fromRGB(140, 110,  65), clock =  9 },
@@ -387,6 +387,132 @@ local function setupLighting()
 	return atmo
 end
 
+-- ── Obby generator ──────────────────────────────────────────────────────
+-- Procedural obstacle course per planet, scaled by gravity.
+-- Lower gravity = bigger gaps (you jump farther). Beacon at the end.
+
+local EARTH_GRAVITY = 9.82
+
+local function generateObby(parent: Instance, planetId: string, center: Vector3, gravityMs2: number, seed: number): Part
+	local rng = mulberry32(seed)
+	local look = LOOK[planetId] or LOOK.moon
+	local gRatio = math.sqrt(EARTH_GRAVITY / gravityMs2) -- jump distance scale
+
+	-- Platform sizing
+	local platWidth = 6
+	local platDepth = 6
+	local platHeight = 1.2
+
+	-- Color from planet ground, slightly varied
+	local baseColor = look.ground
+	local accentColor = lighten(baseColor, 0.15)
+
+	local obbyFolder = Instance.new("Folder")
+	obbyFolder.Name = planetId .. "Obby"
+	obbyFolder.Parent = parent
+
+	-- Start near landing pad, extend outward along +X
+	local curX = center.X + 15
+	local curY = 3
+	local curZ = center.Z
+
+	-- Number of platforms
+	local count = 15 + math.floor(rng() * 6) -- 15-20
+
+	for i = 1, count do
+		-- Gap distance scaled by gravity ratio
+		local baseGap = 8 + rng() * 6  -- 8-14 studs base gap
+		local gap = baseGap * gRatio
+
+		-- Height change: mostly up, sometimes level, rarely down
+		local roll = rng()
+		local dy
+		if roll < 0.3 then
+			dy = 0 -- level
+		elseif roll < 0.7 then
+			dy = 3 + rng() * 5 -- climb up
+		elseif roll < 0.85 then
+			dy = 8 + rng() * 6 -- big climb (pillar)
+		else
+			dy = -(2 + rng() * 3) -- drop down
+		end
+		dy = dy * gRatio * 0.5 -- scale height changes too
+
+		curX = curX + gap
+		curY = math.max(2, curY + dy)
+		curZ = curZ + (rng() - 0.5) * 8 * gRatio -- slight lateral wobble
+
+		-- Platform width variation
+		local w = platWidth - rng() * 2  -- 4-6 wide
+		local d = platDepth - rng() * 2
+
+		-- Alternate colors for visual rhythm
+		local col = if i % 3 == 0 then accentColor else baseColor
+		local mat = if i % 5 == 0 then Enum.Material.Metal else Enum.Material.Slate
+
+		local plat = part(obbyFolder, "Plat" .. i,
+			Vector3.new(w, platHeight, d),
+			CFrame.new(curX, curY, curZ),
+			col, mat)
+		plat.CastShadow = true
+
+		-- Every few platforms, add a tall pillar underneath for visual weight
+		if dy > 5 or i % 4 == 0 then
+			local pillarH = curY
+			if pillarH > 2 then
+				part(obbyFolder, "Pillar" .. i,
+					Vector3.new(2, pillarH, 2),
+					CFrame.new(curX, pillarH / 2, curZ),
+					darken(baseColor, 0.6), Enum.Material.Concrete)
+			end
+		end
+	end
+
+	-- Beacon at the end: glowing neon cylinder with a light beam
+	local beaconY = curY + 3
+	local beacon = Instance.new("Part")
+	beacon.Name = planetId .. "Beacon"
+	beacon.Shape = Enum.PartType.Cylinder
+	beacon.Size = Vector3.new(5, 3, 3)
+	beacon.CFrame = CFrame.new(curX, beaconY, curZ) * CFrame.Angles(0, 0, math.rad(90))
+	beacon.Color = Color3.fromRGB(60, 255, 120)
+	beacon.Material = Enum.Material.Neon
+	beacon.Transparency = 0.15
+	beacon.Anchored = true
+	beacon.CanCollide = true
+	beacon.CastShadow = false
+	beacon:SetAttribute("PlanetId", planetId)
+	beacon.Parent = obbyFolder
+
+	-- Beacon light
+	local beaconLight = Instance.new("PointLight")
+	beaconLight.Color = Color3.fromRGB(60, 255, 120)
+	beaconLight.Brightness = 3
+	beaconLight.Range = 40
+	beaconLight.Parent = beacon
+
+	-- Upward light beam from beacon
+	local beam = Instance.new("Part")
+	beam.Name = "BeaconBeam"
+	beam.Size = Vector3.new(0.5, 80, 0.5)
+	beam.CFrame = CFrame.new(curX, beaconY + 40, curZ)
+	beam.Color = Color3.fromRGB(60, 255, 120)
+	beam.Material = Enum.Material.Neon
+	beam.Transparency = 0.6
+	beam.Anchored = true
+	beam.CanCollide = false
+	beam.CastShadow = false
+	beam.Parent = obbyFolder
+
+	-- Landing platform under the beacon (bigger, so you can land on it)
+	part(obbyFolder, "BeaconPad",
+		Vector3.new(10, platHeight, 10),
+		CFrame.new(curX, curY, curZ),
+		Color3.fromRGB(40, 180, 80), Enum.Material.Neon)
+
+	return beacon
+end
+
 -- ── Build ────────────────────────────────────────────────────────────────
 
 local function build()
@@ -638,6 +764,7 @@ local function build()
 	destinations.Parent = folder
 
 	local planetPads = {}
+	local beacons = {}
 	for index, planet in Catalog.PLANETS do
 		if planet.id ~= "earth" then
 			local look = LOOK[planet.id] or LOOK.moon
@@ -686,6 +813,10 @@ local function build()
 			-- Particle effects
 			addParticles(destinations, center, PARTICLES[planet.id])
 
+			-- Obstacle course with beacon goal
+			local beacon = generateObby(destinations, planet.id, center, planet.gravityMs2, index * 313)
+			beacons[planet.id] = beacon
+
 			-- Ambient point lights for gas/ice giants (bioluminescent-style)
 			if planet.archetype == "gas" or planet.archetype == "ice" then
 				local lightRng = mulberry32(index * 777)
@@ -724,6 +855,7 @@ local function build()
 		bench = bench,
 		buildPrompt = buildPrompt,
 		planetPads = planetPads,
+		beacons = beacons,
 		hexColor = hexColor,
 	}
 end

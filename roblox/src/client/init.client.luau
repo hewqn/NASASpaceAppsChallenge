@@ -230,19 +230,30 @@ local function clear(frame)
 end
 
 -- ── Pages ───────────────────────────────────────────────────────────────
-local function page(name)
+local function page(name, isPanel)
 	local p = Instance.new("ScrollingFrame")
 	p.Name = name
-	p.Size = UDim2.new(1, 0, 1, 0)
+	if isPanel then
+		-- Side panel: right side, not fullscreen
+		p.Size = UDim2.new(0, 340, 1, -20)
+		p.Position = UDim2.new(1, -350, 0, 10)
+	else
+		p.Size = UDim2.new(1, 0, 1, 0)
+	end
 	p.CanvasSize = UDim2.new(0, 0, 0, 0)
 	p.AutomaticCanvasSize = Enum.AutomaticSize.Y
 	p.ScrollBarThickness = 3
 	p.ScrollBarImageColor3 = ACCENT
 	p.BackgroundColor3 = BG
+	p.BackgroundTransparency = if isPanel then 0.05 else 0
 	p.BorderSizePixel = 0
 	p.Visible = false
-	pad(p, 16, 16, 16, 16)
+	pad(p, 12, 12, 12, 12)
 	listLayout(p, 10)
+	if isPanel then
+		corner(p, 10)
+		stroke(p, BORDER, 1, 0.3)
+	end
 	p.Parent = gui
 	return p
 end
@@ -285,7 +296,7 @@ label(introCard, "Eight planets. Real NASA surface data. One suit between you an
 divider(introCard)
 label(introCard, "Scavenge materials. Layer them however you want. The physics will tell you if it works.", 13, TEXT_DIM)
 divider(introCard)
-label(introCard, "Survive 20 minutes.", 14, TEXT_WHITE, FONT_TITLE)
+label(introCard, "Reach the beacon before your suit gives out.", 14, TEXT_WHITE, FONT_TITLE)
 
 local startBtn = btn(introContent, "Start", true)
 startBtn.Size = UDim2.new(1, 0, 0, 48)
@@ -307,14 +318,14 @@ local objCard = card(noteContent, true)
 label(objCard, "1. Walk to glowing material piles and press E to collect.", 13, TEXT_WHITE)
 label(objCard, "2. Open the workshop to build your suit layer by layer.", 13, TEXT_WHITE)
 label(objCard, "3. Pick a planet, choose a side (hot or cold), and deploy.", 13, TEXT_WHITE)
-label(objCard, "4. Survive 20 real-time minutes using only what you built.", 13, TEXT_WHITE)
+label(objCard, "4. Run the obby and reach the beacon before your suit fails.", 13, TEXT_WHITE)
 
 local hintLabel = label(noteContent, "", 12, WARNING, FONT_MONO)
 
 local openBuild = btn(noteContent, "Open Workshop", true)
 
 -- ── Workshop ────────────────────────────────────────────────────────────
-local workshop = page("Workshop")
+local workshop = page("Workshop", true)
 
 local function designFrom(d)
 	if d == nil then return Design.emptyDesign() end
@@ -599,7 +610,7 @@ openBuild.MouseButton1Click:Connect(function()
 end)
 
 -- ── Planets ─────────────────────────────────────────────────────────────
-local planets = page("Planets")
+local planets = page("Planets", true)
 
 local DEMO_MODE = true
 
@@ -706,7 +717,7 @@ function renderPlanets()
 end
 
 -- ── Difficulty / Briefing ───────────────────────────────────────────────
-local difficulty = page("Difficulty")
+local difficulty = page("Difficulty", true)
 
 function renderDifficulty()
 	clear(difficulty)
@@ -805,7 +816,7 @@ hud.Parent = gui
 local hudTitle = label(hud, "MISSION", 10, ACCENT, FONT_TITLE)
 local hudPlanet = label(hud, "", 16, TEXT_WHITE, FONT_TITLE)
 local hudSide = label(hud, "", 11, TEXT_DIM, FONT_MONO)
-local hudClock = label(hud, "0:00 / 20:00", 18, TEXT_WHITE, FONT_MONO)
+local hudClock = label(hud, "0:00", 18, TEXT_WHITE, FONT_MONO)
 hudClock.TextXAlignment = Enum.TextXAlignment.Center
 
 local _, airFill = meter(hud, "AIR SEAL", 100, 100, ACCENT)
@@ -847,7 +858,7 @@ local function renderHud()
 
 	hudPlanet.Text = player:GetAttribute("MissionPlanet") or ""
 	hudSide.Text = (player:GetAttribute("MissionSide") or "") .. "  |  " .. (player:GetAttribute("MissionDifficulty") or "")
-	hudClock.Text = clock(player:GetAttribute("MissionClock") or 0) .. " / 20:00"
+	hudClock.Text = clock(player:GetAttribute("MissionClock") or 0)
 
 	local airHeld = player:GetAttribute("AirHeld") or 100
 	airFill.Size = UDim2.new(math.clamp(airHeld / 100, 0, 1), 0, 1, 0)
