@@ -337,18 +337,19 @@ local function depart(player: Player, planetId: string, difficultyId: string, si
 	end
 	local profile = Catalog.difficultyById(difficultyId)
 	local planet = Catalog.planetById(planetId)
+	local pad = world.planetPads[planetId]
 	session.mission = {
 		planetId = planetId,
 		difficultyId = difficultyId,
 		side = side,
 		minSafetyFactor = profile.minSafetyFactor,
 		vitals = Survival.initialVitals(session.design),
+		lastCheckpoint = if pad then pad.CFrame + Vector3.new(0, 5, 0) else nil,
 	}
 	workspace.Gravity = gravityFor(planetId)
 	applyLook(planetId)
 	local character = player.Character
 	local root = character and character:FindFirstChild("HumanoidRootPart")
-	local pad = world.planetPads[planetId]
 	if root and pad then
 		root.CFrame = pad.CFrame + Vector3.new(0, 5, 0)
 	end
@@ -408,6 +409,38 @@ for planetId, beacon in world.beacons do
 			session.mission.vitals.reachedBeacon = true
 		end
 	end)
+end
+
+-- Kill zone touch = die and respawn at checkpoint
+for _, descendant in world.destinations:GetDescendants() do
+	if descendant:IsA("BasePart") and descendant:GetAttribute("KillZone") then
+		descendant.Touched:Connect(function(hit)
+			local character = hit.Parent
+			if character == nil then return end
+			local humanoid = character:FindFirstChildOfClass("Humanoid")
+			if humanoid and humanoid.Health > 0 then
+				humanoid.Health = 0
+			end
+		end)
+	end
+end
+
+-- Checkpoint touch = save respawn point
+for _, descendant in world.destinations:GetDescendants() do
+	if descendant:IsA("BasePart") and descendant:GetAttribute("Checkpoint") then
+		descendant.Touched:Connect(function(hit)
+			local character = hit.Parent
+			if character == nil then return end
+			local player = Players:GetPlayerFromCharacter(character)
+			if player == nil then return end
+			local session = sessions[player]
+			if session == nil or session.mission == nil then return end
+			local cpPlanet = descendant:GetAttribute("PlanetId")
+			if cpPlanet == session.mission.planetId then
+				session.mission.lastCheckpoint = descendant.CFrame + Vector3.new(0, 3, 0)
+			end
+		end)
+	end
 end
 
 -- Add a layer to the suit
@@ -503,7 +536,18 @@ local function bind(player: Player)
 		wear(player)
 		local session = sessions[player]
 		if session and session.mission then
-			home(player)
+			-- Respawn at last checkpoint instead of ending the mission
+			local checkpoint = session.mission.lastCheckpoint
+			if checkpoint then
+				local root = character:WaitForChild("HumanoidRootPart", 5)
+				if root then
+					workspace.Gravity = gravityFor(session.mission.planetId)
+					applyLook(session.mission.planetId)
+					root.CFrame = checkpoint
+				end
+			else
+				home(player)
+			end
 		end
 	end)
 	if player.Character then
