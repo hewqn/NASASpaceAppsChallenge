@@ -7,7 +7,7 @@ local Catalog = require(ReplicatedStorage:WaitForChild("CODAG").Data.Catalog)
 -- Colors derived from NASA imagery and real surface observations
 
 local LOOK = {
-	earth   = { ground = Color3.fromRGB(111, 143,  98), sky = Color3.fromRGB( 30,  40,  60), clock = 0 },
+	earth   = { ground = Color3.fromRGB(111, 143,  98), sky = Color3.fromRGB( 60,  75, 100), clock = 6 },
 	moon    = { ground = Color3.fromRGB(160, 155, 148), sky = Color3.fromRGB(  4,   4,   8), clock = 14 },
 	mercury = { ground = Color3.fromRGB(140, 130, 118), sky = Color3.fromRGB( 10,   8,   6), clock = 14 },
 	venus   = { ground = Color3.fromRGB(180, 130,  60), sky = Color3.fromRGB(160, 110,  40), clock = 12 },

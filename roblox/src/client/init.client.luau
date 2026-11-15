@@ -83,9 +83,16 @@ gui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
 gui.Parent = player.PlayerGui
 
 -- ── Mobile detection ────────────────────────────────────────────────────
+local UserInputService = game:GetService("UserInputService")
+local GuiService = game:GetService("GuiService")
 local camera = workspace.CurrentCamera
-local viewportWidth = camera and camera.ViewportSize.X or 1920
-local IS_MOBILE = viewportWidth < 600
+local screenWidth = camera and camera.ViewportSize.X or 1920
+-- Only mobile if touch-only device with a small screen (not Studio, not tablet)
+local IS_MOBILE = UserInputService.TouchEnabled
+	and not UserInputService.KeyboardEnabled
+	and not UserInputService.MouseEnabled
+	and not GuiService:IsTenFootInterface()
+	and screenWidth < 700
 
 -- ── Helpers ─────────────────────────────────────────────────────────────
 local function corner(parent, radius)
