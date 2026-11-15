@@ -2,7 +2,8 @@
 
 **2026 NASA Space Apps Challenge** | Team CODAG | University of Calgary
 
-A Roblox game where players design survival suits from real engineering materials and test them on planets across the solar system. Every planet uses real NASA data. Every material has real physical properties. The game teaches players that space exploration is an engineering problem with no single right answer -- your suit has to handle the actual temperatures, pressures, and atmospheres that NASA has measured.
+A Roblox game where players design survival suits from real engineering materials and test them on planets across the solar system. Every planet uses real NASA data. Every material has real physical properties. The game teaches players that space exploration is an engineering problem with no single right answer, where your suit has to cater to all obstacles thrown.
+
 
 ## What It Does
 
