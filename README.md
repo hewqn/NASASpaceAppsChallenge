@@ -1,12 +1,12 @@
-# CODAG.0 -- Can Our Design Actually Go?
+# CODAG.0: Can Our Design Actually Go?
 
 **2026 NASA Space Apps Challenge** | Team UNAC | University of Calgary
 
-A Roblox game where players design survival suits from real engineering materials and test them on planets across the solar system. Every planet uses real NASA data. Every material has real physical properties. The game teaches players that space exploration is an engineering problem with no single right answer -- your suit has to handle the actual temperatures, pressures, and atmospheres that NASA has measured.
+A Roblox game where players design survival suits from real engineering materials and test them on planets across the solar system. Every planet uses real NASA data. Every material has real physical properties. The game teaches players that space exploration is an engineering problem with no single right answer. Your suit has to handle the actual temperatures, pressures, and atmospheres that NASA has measured.
 
 ## What It Does
 
-You start in a space station orbiting Earth. Around you are storage racks holding 13 real materials: metals like aluminum and titanium, insulators like aerogel and Mylar, and an oxygen tank. You pick them up and layer them onto a suit in any order you choose, at four thickness options (thin, medium, thick, heavy). Then you choose a destination -- the Moon, Mars, Mercury, Venus, Jupiter, Saturn, Uranus, or Neptune -- and the game simulates whether your suit keeps you alive for 20 minutes.
+You start in a space station orbiting Earth. Around you are storage racks holding 13 real materials: metals like aluminum and titanium, insulators like aerogel and Mylar, and an oxygen tank. You pick them up and layer them onto a suit in any order you choose, at four thickness options (thin, medium, thick, heavy). Then you choose a destination (the Moon, Mars, Mercury, Venus, Jupiter, Saturn, Uranus, or Neptune) and the game simulates whether your suit keeps you alive for 20 minutes.
 
 The simulation checks:
 
@@ -41,9 +41,9 @@ The simulation runs for 1200 seconds (20 minutes) with a 5-second time step.
 
 ## What Makes It Creative
 
-Most space education games give you preset ships or binary pass/fail missions. CODAG.0 gives you a box of real materials and says "figure it out." There's no tutorial that tells you aerogel is the best insulator -- you learn that by trying wool on Venus and watching it burn. You learn that carbon fiber is strong and light but doesn't insulate. You learn that Mylar is almost useless in an atmosphere but extraordinary in vacuum.
+Most space education games give you preset ships or binary pass/fail missions. CODAG.0 gives you a box of real materials and says "figure it out." There's no tutorial that tells you aerogel is the best insulator. You learn that by trying wool on Venus and watching it burn. You learn that carbon fiber is strong and light but doesn't insulate. You learn that Mylar is almost useless in an atmosphere but extraordinary in vacuum.
 
-The game also doesn't simplify the planets. Venus really does have 92 bars of surface pressure and a surface temperature of 737 K. Jupiter really doesn't have a surface -- you're at the 1-bar level. Neptune's scale height is a range, not a single number, because that's what NASA's data says. We didn't round, average, or simplify these numbers.
+The game also doesn't simplify the planets. Venus really does have 92 bars of surface pressure and a surface temperature of 737 K. Jupiter really doesn't have a surface, so you're at the 1-bar level. Neptune's scale height is a range, not a single number, because that's what NASA's data says. We didn't round, average, or simplify these numbers.
 
 ## Tools and Technologies
 
