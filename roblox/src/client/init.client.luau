@@ -281,12 +281,11 @@ spacer2.BackgroundTransparency = 1
 spacer2.Parent = introContent
 
 local introCard = card(introContent, true)
-label(introCard, "Every planet in this game uses real NASA data from the NSSDC Planetary Fact Sheets.", 13, TEXT_DIM)
-label(introCard, "Surface temperature, atmospheric pressure, gravity, composition. Nothing is made up.", 13, TEXT_DIM)
+label(introCard, "Eight planets. Real NASA surface data. One suit between you and all of it.", 13, TEXT_DIM)
 divider(introCard)
-label(introCard, "Collect materials scattered around the yard. Stack them as layers on your suit. Each material has real thermal conductivity, yield strength, density, and melting point.", 13, TEXT_DIM)
+label(introCard, "Scavenge materials. Layer them however you want. The physics will tell you if it works.", 13, TEXT_DIM)
 divider(introCard)
-label(introCard, "Then pick a planet and survive 20 minutes.", 14, TEXT_WHITE, FONT_TITLE)
+label(introCard, "Survive 20 minutes.", 14, TEXT_WHITE, FONT_TITLE)
 
 local startBtn = btn(introContent, "Start", true)
 startBtn.Size = UDim2.new(1, 0, 0, 48)
