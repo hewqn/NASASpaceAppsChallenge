@@ -82,6 +82,11 @@ gui.ResetOnSpawn = false
 gui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
 gui.Parent = player.PlayerGui
 
+-- ── Mobile detection ────────────────────────────────────────────────────
+local camera = workspace.CurrentCamera
+local viewportWidth = camera and camera.ViewportSize.X or 1920
+local IS_MOBILE = viewportWidth < 600
+
 -- ── Helpers ─────────────────────────────────────────────────────────────
 local function corner(parent, radius)
 	local c = Instance.new("UICorner")
@@ -234,9 +239,15 @@ local function page(name, isPanel)
 	local p = Instance.new("ScrollingFrame")
 	p.Name = name
 	if isPanel then
-		-- Side panel: right side, not fullscreen
-		p.Size = UDim2.new(0, 340, 1, -20)
-		p.Position = UDim2.new(1, -350, 0, 10)
+		if IS_MOBILE then
+			-- Mobile: full-width panel with small margin
+			p.Size = UDim2.new(1, -16, 1, -20)
+			p.Position = UDim2.new(0, 8, 0, 10)
+		else
+			-- Desktop: side panel on the right
+			p.Size = UDim2.new(0, 340, 1, -20)
+			p.Position = UDim2.new(1, -350, 0, 10)
+		end
 	else
 		p.Size = UDim2.new(1, 0, 1, 0)
 	end
@@ -277,12 +288,13 @@ introListLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center
 introContent.Parent = intro
 
 local spacer1 = Instance.new("Frame")
-spacer1.Size = UDim2.new(1, 0, 0, 60)
+spacer1.Size = UDim2.new(1, 0, 0, if IS_MOBILE then 30 else 60)
 spacer1.BackgroundTransparency = 1
 spacer1.Parent = introContent
 
+local logoSize = if IS_MOBILE then 140 else 200
 local introLogo = Instance.new("ImageLabel")
-introLogo.Size = UDim2.new(0, 200, 0, 200)
+introLogo.Size = UDim2.new(0, logoSize, 0, logoSize)
 introLogo.BackgroundTransparency = 1
 introLogo.Image = "rbxassetid://135974007304660"
 introLogo.ScaleType = Enum.ScaleType.Fit
@@ -291,7 +303,7 @@ local introLogoLayout = Instance.new("UIAspectRatioConstraint")
 introLogoLayout.AspectRatio = 1
 introLogoLayout.Parent = introLogo
 
-local introSub = label(introContent, "BUILD YOUR SURVIVAL SUIT. FACE THE SOLAR SYSTEM.", 14, TEXT_DIM, FONT_TITLE)
+local introSub = label(introContent, "BUILD YOUR SURVIVAL SUIT. FACE THE SOLAR SYSTEM.", if IS_MOBILE then 12 else 14, TEXT_DIM, FONT_TITLE)
 introSub.TextXAlignment = Enum.TextXAlignment.Center
 
 local spacer2 = Instance.new("Frame")
@@ -742,7 +754,7 @@ function renderDifficulty()
 	local planet = Catalog.planetById(chosenPlanet)
 
 	label(difficulty, "MISSION BRIEFING", 11, ACCENT, FONT_TITLE)
-	label(difficulty, planet.name, 28, TEXT_WHITE, FONT_DISPLAY)
+	label(difficulty, planet.name, if IS_MOBILE then 22 else 28, TEXT_WHITE, FONT_DISPLAY)
 	label(difficulty, planet.role, 12, ACCENT)
 
 	divider(difficulty)
@@ -817,9 +829,14 @@ end
 -- ── HUD ─────────────────────────────────────────────────────────────────
 local hud = Instance.new("Frame")
 hud.Name = "HUD"
-hud.Size = UDim2.new(0, 260, 0, 0)
+if IS_MOBILE then
+	hud.Size = UDim2.new(1, -16, 0, 0)
+	hud.Position = UDim2.new(0, 8, 0, 8)
+else
+	hud.Size = UDim2.new(0, 260, 0, 0)
+	hud.Position = UDim2.new(1, -276, 0, 16)
+end
 hud.AutomaticSize = Enum.AutomaticSize.Y
-hud.Position = UDim2.new(1, -276, 0, 16)
 hud.BackgroundColor3 = BG_PANEL
 hud.BackgroundTransparency = 0.15
 hud.BorderSizePixel = 0
