@@ -597,6 +597,7 @@ function renderWorkshop()
 	local toPlanets = btn(workshop, "Choose destination", true)
 	toPlanets.Size = UDim2.new(1, 0, 0, 44)
 	toPlanets.MouseButton1Click:Connect(function()
+		warn("[CODAG Client] Choose destination clicked, state =", state ~= nil)
 		show(planets)
 		renderPlanets()
 	end)
@@ -632,11 +633,16 @@ local function isOpen(planetId: string): boolean
 end
 
 function renderPlanets()
+	warn("[CODAG Client] renderPlanets called, state =", state ~= nil)
 	clear(planets)
 
-	if state == nil then return end
+	if state == nil then
+		warn("[CODAG Client] renderPlanets: state is nil, aborting")
+		return
+	end
 
 	local design = designFrom(state.design)
+	warn("[CODAG Client] renderPlanets: design layers =", #design.layers, "planets =", #Sources.DESTINATION_ORDER)
 	local check = 1.5
 
 	label(planets, "DESTINATIONS", 11, ACCENT, FONT_TITLE)
@@ -689,8 +695,16 @@ function renderPlanets()
 		if open then
 			label(planetCard, string.format("Gravity: %.2f m/s2  |  %s", planet.gravityMs2, planet.role), 11, ACCENT, FONT_MONO)
 
-			local hotResult = Survival.kidResult(design, planet, check, "hot")
-			local coldResult = Survival.kidResult(design, planet, check, "cold")
+			local hotOk, hotResult = pcall(Survival.kidResult, design, planet, check, "hot")
+			if not hotOk then
+				warn("[CODAG Client] kidResult HOT error for", planetId, ":", hotResult)
+				hotResult = "Hot side: error"
+			end
+			local coldOk, coldResult = pcall(Survival.kidResult, design, planet, check, "cold")
+			if not coldOk then
+				warn("[CODAG Client] kidResult COLD error for", planetId, ":", coldResult)
+				coldResult = "Cold side: error"
+			end
 			label(planetCard, hotResult, 10, TEXT_DIM, FONT_MONO)
 			label(planetCard, coldResult, 10, TEXT_DIM, FONT_MONO)
 
@@ -707,6 +721,7 @@ function renderPlanets()
 		end
 	end
 
+	warn("[CODAG Client] renderPlanets: finished rendering all planets")
 	divider(planets)
 
 	local back = btn(planets, "Back to workshop", false)

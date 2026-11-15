@@ -138,8 +138,10 @@ local function publicDesign(design)
 end
 
 local function sendState(player: Player)
+	warn("[CODAG Server] sendState called for", player.Name)
 	local session = sessions[player]
 	if session == nil then
+		warn("[CODAG Server] sendState: no session for", player.Name)
 		return
 	end
 	local clears = {}
@@ -309,8 +311,10 @@ local function stepMission(player: Player, realDt: number)
 end
 
 local function depart(player: Player, planetId: string, difficultyId: string, side: string)
+	warn("[CODAG Server] depart called:", player.Name, planetId, difficultyId, side)
 	local session = sessions[player]
 	if session == nil or session.mission ~= nil then
+		warn("[CODAG Server] depart: rejected (nil session or active mission)")
 		return
 	end
 	if side ~= "hot" and side ~= "cold" then
@@ -369,6 +373,7 @@ local function collect(player: Player, materialId: string)
 end
 
 local function startSession(player: Player)
+	warn("[CODAG Server] startSession for", player.Name)
 	sessions[player] = {
 		inventory = emptyInventory(),
 		design = Design.emptyDesign(),
@@ -478,7 +483,9 @@ SetOxygen.OnServerEvent:Connect(function(player, kg)
 end)
 
 Depart.OnServerEvent:Connect(function(player, planetId, difficultyId, side)
+	warn("[CODAG Server] Depart event:", player.Name, planetId, difficultyId, side)
 	if typeof(planetId) ~= "string" or typeof(difficultyId) ~= "string" or typeof(side) ~= "string" then
+		warn("[CODAG Server] Depart: type check failed")
 		return
 	end
 	depart(player, planetId, difficultyId, side)

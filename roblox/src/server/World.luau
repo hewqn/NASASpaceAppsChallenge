@@ -746,130 +746,274 @@ local function build()
 		end
 	end
 
-	-- ── Material caches ──────────────────────────────────────────────────
-	-- Each material gets a distinct shape matching what it actually is
+	-- ── Supply depot (materials on industrial shelving racks) ────────────
 
 	local caches = {}
 
-	local function materialShape(mat, x: number, z: number): Part
+	local depotX = 14
+	local rackSpacing = 5.5
+	local rackW = 6
+	local rackD = 2.5
+	local shelfStep = 2.2
+
+	-- Build a metal shelving rack frame
+	local function buildRack(rackX, rackZ, rackLabel)
+		local postCol = Color3.fromRGB(65, 72, 82)
+		local shelfCol = Color3.fromRGB(82, 88, 98)
+		local totalH = 7.2
+
+		for _, dx in { -(rackW / 2 - 0.1), rackW / 2 - 0.1 } do
+			for _, dz in { -(rackD / 2 - 0.1), rackD / 2 - 0.1 } do
+				part(earth, "RackPost", Vector3.new(0.2, totalH, 0.2),
+					CFrame.new(rackX + dx, totalH / 2 + 0.3, rackZ + dz),
+					postCol, Enum.Material.Metal)
+			end
+		end
+		for level = 0, 2 do
+			local sy = 0.3 + level * shelfStep
+			part(earth, "Shelf" .. level, Vector3.new(rackW, 0.12, rackD),
+				CFrame.new(rackX, sy, rackZ), shelfCol, SP)
+		end
+		part(earth, "RackCap", Vector3.new(rackW, 0.08, rackD),
+			CFrame.new(rackX, totalH + 0.3, rackZ), postCol, Enum.Material.Metal)
+
+		if rackLabel then
+			local sign = part(earth, "RackSign", Vector3.new(rackW - 0.4, 0.5, 0.05),
+				CFrame.new(rackX, totalH - 0.3, rackZ + rackD / 2 + 0.05),
+				accent, SP)
+			local sg = Instance.new("SurfaceGui")
+			sg.Face = Enum.NormalId.Front
+			sg.SizingMode = Enum.SurfaceGuiSizingMode.PixelsPerStud
+			sg.PixelsPerStud = 40
+			sg.Parent = sign
+			local lbl = Instance.new("TextLabel")
+			lbl.Size = UDim2.fromScale(1, 1)
+			lbl.BackgroundTransparency = 1
+			lbl.Font = Enum.Font.GothamBold
+			lbl.TextColor3 = hull
+			lbl.TextScaled = true
+			lbl.Text = rackLabel
+			lbl.Parent = sg
+		end
+	end
+
+	-- Compact material shapes for shelf display
+	local function materialShape(mat, x: number, z: number, baseY: number): Part
 		local col = hexColor(mat.color)
 		local pile
+		baseY = baseY or 0.4
 
 		if mat.id == "aluminum" then
-			-- Stack of flat metal sheets
-			for si = 0, 3 do
+			-- Stacked flat metal sheets
+			for si = 0, 2 do
 				local sheet = part(earth, "AlSheet" .. si,
-					Vector3.new(3.5, 0.15, 2.5),
-					CFrame.new(x + (si % 2) * 0.2, 0.55 + si * 0.2, z),
+					Vector3.new(2.5, 0.1, 1.5),
+					CFrame.new(x + si * 0.08, baseY + 0.08 + si * 0.12, z),
 					lighten(col, si * 0.03), Enum.Material.Metal)
-				if si == 3 then pile = sheet end
+				if si == 2 then pile = sheet end
 			end
-			-- Leaning sheet against the stack
-			part(earth, "AlLean", Vector3.new(3, 0.1, 2),
-				CFrame.new(x + 1.8, 1.2, z) * CFrame.Angles(0, 0, math.rad(70)),
-				col, Enum.Material.Metal)
 
 		elseif mat.id == "steel" then
-			-- I-beam lying on the ground + some scrap plates
-			-- Main beam (horizontal)
-			part(earth, "SteelBeam", Vector3.new(5, 0.5, 0.5),
-				CFrame.new(x, 0.65, z), col, Enum.Material.DiamondPlate)
-			-- Flanges
-			part(earth, "SteelFlangeT", Vector3.new(5, 0.15, 1.5),
-				CFrame.new(x, 0.95, z), col, Enum.Material.DiamondPlate)
-			part(earth, "SteelFlangeB", Vector3.new(5, 0.15, 1.5),
-				CFrame.new(x, 0.5, z), col, Enum.Material.DiamondPlate)
-			-- Scrap plate leaning against beam
-			pile = part(earth, mat.id, Vector3.new(2, 2, 0.2),
-				CFrame.new(x - 0.5, 1.4, z + 1.2) * CFrame.Angles(0, math.rad(15), math.rad(-15)),
-				darken(col, 0.8), Enum.Material.DiamondPlate)
+			-- Short I-beam section
+			part(earth, "SteelWeb", Vector3.new(3, 0.3, 0.3),
+				CFrame.new(x, baseY + 0.35, z), col, Enum.Material.DiamondPlate)
+			part(earth, "SteelFT", Vector3.new(3, 0.1, 1),
+				CFrame.new(x, baseY + 0.55, z), col, Enum.Material.DiamondPlate)
+			pile = part(earth, mat.id, Vector3.new(3, 0.1, 1),
+				CFrame.new(x, baseY + 0.2, z), col, Enum.Material.DiamondPlate)
+
+		elseif mat.id == "titanium" then
+			-- Polished ingot blocks
+			pile = part(earth, mat.id, Vector3.new(2.2, 0.8, 1.5),
+				CFrame.new(x, baseY + 0.5, z), col, SP)
+			part(earth, "TiBlock2", Vector3.new(1.5, 0.6, 1.2),
+				CFrame.new(x + 0.8, baseY + 0.4, z + 0.3), lighten(col, 0.05), SP)
+
+		elseif mat.id == "carbonfiber" then
+			-- Dark woven panels stacked flat
+			for si = 0, 2 do
+				local panel = part(earth, "CFPanel" .. si,
+					Vector3.new(2.5, 0.08, 1.8),
+					CFrame.new(x, baseY + 0.06 + si * 0.1, z),
+					lighten(col, si * 0.02), SP)
+				if si == 2 then pile = panel end
+			end
+
+		elseif mat.id == "copper" then
+			-- Bundle of short pipes lying on the shelf
+			for pi = 0, 2 do
+				local pipe = Instance.new("Part")
+				pipe.Name = "CuPipe" .. pi
+				pipe.Shape = Enum.PartType.Cylinder
+				pipe.Size = Vector3.new(2.5, 0.45, 0.45)
+				pipe.CFrame = CFrame.new(x, baseY + 0.25 + pi * 0.05, z - 0.25 + pi * 0.25)
+				pipe.Color = lighten(col, pi * 0.04)
+				pipe.Material = Enum.Material.Metal
+				pipe.Anchored = true
+				pipe.Parent = earth
+				if pi == 2 then pile = pipe end
+			end
+
+		elseif mat.id == "glass" then
+			-- Transparent panes standing
+			pile = part(earth, mat.id, Vector3.new(2, 1.2, 0.15),
+				CFrame.new(x, baseY + 0.7, z), col, Enum.Material.Glass)
+			pile.Transparency = 0.3
+			local pane2 = part(earth, "GlassPane2", Vector3.new(1.8, 1, 0.12),
+				CFrame.new(x + 0.3, baseY + 0.6, z + 0.3), lighten(col, 0.05), Enum.Material.Glass)
+			pane2.Transparency = 0.35
 
 		elseif mat.id == "aerogel" then
-			-- Translucent slab, almost ghostly
-			pile = part(earth, mat.id, Vector3.new(3, 2, 2.5),
-				CFrame.new(x, 1.4, z), col, Enum.Material.Glass)
+			-- Translucent block with inner glow
+			pile = part(earth, mat.id, Vector3.new(2, 1.2, 1.5),
+				CFrame.new(x, baseY + 0.7, z), col, Enum.Material.Glass)
 			pile.Transparency = 0.4
-			-- Inner glow
 			local glow = Instance.new("PointLight")
 			glow.Color = col
-			glow.Brightness = 0.5
-			glow.Range = 8
+			glow.Brightness = 0.4
+			glow.Range = 6
 			glow.Parent = pile
 
 		elseif mat.id == "wool" then
-			-- Rolled-up batting (cylinder on its side)
+			-- Rolled batting cylinder
 			pile = Instance.new("Part")
 			pile.Name = mat.id
 			pile.Shape = Enum.PartType.Cylinder
-			pile.Size = Vector3.new(3, 2.5, 2.5)
-			pile.CFrame = CFrame.new(x, 1.65, z) * CFrame.Angles(0, math.rad(30), math.rad(90))
+			pile.Size = Vector3.new(2, 1.5, 1.5)
+			pile.CFrame = CFrame.new(x, baseY + 0.85, z) * CFrame.Angles(0, math.rad(20), math.rad(90))
 			pile.Color = col
 			pile.Material = Enum.Material.Fabric
 			pile.Anchored = true
 			pile.Parent = earth
-			-- Second smaller roll next to it
-			local roll2 = Instance.new("Part")
-			roll2.Name = "WoolRoll2"
-			roll2.Shape = Enum.PartType.Cylinder
-			roll2.Size = Vector3.new(2, 1.8, 1.8)
-			roll2.CFrame = CFrame.new(x + 1.5, 1.3, z + 0.8) * CFrame.Angles(0, math.rad(-20), math.rad(90))
-			roll2.Color = lighten(col, 0.1)
-			roll2.Material = Enum.Material.Fabric
-			roll2.Anchored = true
-			roll2.Parent = earth
 
-		elseif mat.id == "oxygen" then
-			-- Cluster of gas cylinders standing upright
+		elseif mat.id == "polyfoam" then
+			-- Spray foam blocks
+			pile = part(earth, mat.id, Vector3.new(2, 1, 1.5),
+				CFrame.new(x, baseY + 0.6, z), col, SP)
+			part(earth, "FoamBlock2", Vector3.new(1.2, 0.8, 1),
+				CFrame.new(x + 0.7, baseY + 0.5, z + 0.3), lighten(col, 0.05), SP)
+
+		elseif mat.id == "mylar" then
+			-- Rolled foil
 			pile = Instance.new("Part")
 			pile.Name = mat.id
 			pile.Shape = Enum.PartType.Cylinder
-			pile.Size = Vector3.new(4, 1.2, 1.2)
-			pile.CFrame = CFrame.new(x, 2.4, z) * CFrame.Angles(0, 0, 0)
+			pile.Size = Vector3.new(2.2, 1.2, 1.2)
+			pile.CFrame = CFrame.new(x, baseY + 0.7, z) * CFrame.Angles(0, math.rad(10), math.rad(90))
+			pile.Color = col
+			pile.Material = Enum.Material.Foil
+			pile.Anchored = true
+			pile.Parent = earth
+
+		elseif mat.id == "fiberglass" then
+			-- Batting roll
+			pile = Instance.new("Part")
+			pile.Name = mat.id
+			pile.Shape = Enum.PartType.Cylinder
+			pile.Size = Vector3.new(2, 1.4, 1.4)
+			pile.CFrame = CFrame.new(x, baseY + 0.8, z) * CFrame.Angles(0, math.rad(-15), math.rad(90))
+			pile.Color = col
+			pile.Material = Enum.Material.Fabric
+			pile.Anchored = true
+			pile.Parent = earth
+
+		elseif mat.id == "kevlar" then
+			-- Woven fabric roll
+			pile = Instance.new("Part")
+			pile.Name = mat.id
+			pile.Shape = Enum.PartType.Cylinder
+			pile.Size = Vector3.new(2.2, 1.3, 1.3)
+			pile.CFrame = CFrame.new(x, baseY + 0.75, z) * CFrame.Angles(0, math.rad(25), math.rad(90))
+			pile.Color = col
+			pile.Material = Enum.Material.Fabric
+			pile.Anchored = true
+			pile.Parent = earth
+
+		elseif mat.id == "oxygen" then
+			-- Small upright gas cylinder with valve cap
+			pile = Instance.new("Part")
+			pile.Name = mat.id
+			pile.Shape = Enum.PartType.Cylinder
+			pile.Size = Vector3.new(1.6, 0.6, 0.6)
+			pile.CFrame = CFrame.new(x, baseY + 0.9, z)
 			pile.Color = col
 			pile.Material = Enum.Material.Metal
 			pile.Anchored = true
 			pile.Parent = earth
-			-- Valve cap on top
 			local cap = Instance.new("Part")
 			cap.Name = "O2Cap"
 			cap.Shape = Enum.PartType.Cylinder
-			cap.Size = Vector3.new(0.6, 1.4, 1.4)
-			cap.CFrame = CFrame.new(x, 4.7, z)
+			cap.Size = Vector3.new(0.3, 0.7, 0.7)
+			cap.CFrame = CFrame.new(x, baseY + 1.75, z)
 			cap.Color = darken(col, 0.6)
 			cap.Material = Enum.Material.Metal
 			cap.Anchored = true
 			cap.Parent = earth
-			-- Second cylinder leaning
-			local tank2 = Instance.new("Part")
-			tank2.Name = "O2Tank2"
-			tank2.Shape = Enum.PartType.Cylinder
-			tank2.Size = Vector3.new(3.5, 1, 1)
-			tank2.CFrame = CFrame.new(x + 1.2, 2, z + 0.5) * CFrame.Angles(0, math.rad(20), math.rad(15))
-			tank2.Color = lighten(col, 0.1)
-			tank2.Material = Enum.Material.Metal
-			tank2.Anchored = true
-			tank2.Parent = earth
 
 		else
-			-- Fallback: labeled crate
-			pile = part(earth, mat.id, Vector3.new(3, 3, 3),
-				CFrame.new(x, 1.9, z), col, Enum.Material.Metal)
+			-- Fallback: labeled box
+			pile = part(earth, mat.id, Vector3.new(2, 1.2, 1.5),
+				CFrame.new(x, baseY + 0.7, z), col, Enum.Material.Metal)
 		end
 
 		return pile
 	end
 
-	for _, material in Catalog.MATERIALS do
-		local x = material.position[1] * 10
-		local z = material.position[3] * 10
+	-- Material assignments: { id, rack index, shelf level (0=bottom 1=mid 2=top) }
+	local depotLayout = {
+		{ id = "aluminum",    rack = 1, level = 0 },
+		{ id = "steel",       rack = 1, level = 1 },
+		{ id = "titanium",    rack = 1, level = 2 },
+		{ id = "carbonfiber", rack = 2, level = 0 },
+		{ id = "copper",      rack = 2, level = 1 },
+		{ id = "glass",       rack = 2, level = 2 },
+		{ id = "aerogel",     rack = 3, level = 0 },
+		{ id = "wool",        rack = 3, level = 1 },
+		{ id = "polyfoam",    rack = 3, level = 2 },
+		{ id = "mylar",       rack = 4, level = 0 },
+		{ id = "fiberglass",  rack = 4, level = 1 },
+		{ id = "kevlar",      rack = 4, level = 2 },
+	}
 
-		-- Small glowing pad under each cache
-		local basePad = part(earth, material.id .. "Pad", Vector3.new(5, 0.1, 5),
-			CFrame.new(x, 0.05, z),
-			hexColor(material.color), Enum.Material.Neon)
-		basePad.Transparency = 0.6
+	-- Rack center positions along the station side
+	local rackCenters = {}
+	for i = 1, 4 do
+		rackCenters[i] = { x = depotX, z = habZ + 6 - (i - 1) * rackSpacing }
+	end
 
-		local pile = materialShape(material, x, z)
+	local rackLabels = { "STRUCTURAL A", "STRUCTURAL B", "INSULATION A", "INSULATION B" }
+	for i, rc in rackCenters do
+		buildRack(rc.x, rc.z, rackLabels[i])
+	end
+
+	-- Depot canopy roof
+	local canopyLen = rackSpacing * 3 + rackD + 3
+	local canopyMid = habZ + 6 - 1.5 * rackSpacing
+	part(earth, "DepotRoof", Vector3.new(rackW + 3, 0.12, canopyLen),
+		CFrame.new(depotX, 7.8, canopyMid), hullAlt, SP)
+	for _, cz in { habZ + 7, habZ + 6 - 3 * rackSpacing - 1 } do
+		part(earth, "CanopyCol", Vector3.new(0.25, 7.8, 0.25),
+			CFrame.new(depotX - rackW / 2 - 1, 3.9, cz), hull, SP)
+		part(earth, "CanopyCol", Vector3.new(0.25, 7.8, 0.25),
+			CFrame.new(depotX + rackW / 2 + 1, 3.9, cz), hull, SP)
+	end
+	part(earth, "CanopyAccent", Vector3.new(rackW + 3, 0.2, 0.15),
+		CFrame.new(depotX, 7.9, canopyMid + canopyLen / 2),
+		accent, Enum.Material.Neon).Transparency = 0.3
+
+	-- Walkway from station to depot
+	part(earth, "DepotWalk", Vector3.new(4, 0.15, 0.8),
+		CFrame.new(9, 0.08, habZ), floorCol, SP)
+	part(earth, "DepotWalkGlow", Vector3.new(3.5, 0.06, 0.3),
+		CFrame.new(9, 0.18, habZ), accent, Enum.Material.Neon).Transparency = 0.4
+
+	-- Place materials on shelves
+	for _, entry in depotLayout do
+		local material = Catalog.materialById(entry.id)
+		local rc = rackCenters[entry.rack]
+		local shelfY = 0.3 + entry.level * shelfStep + 0.12
+
+		local pile = materialShape(material, rc.x, rc.z, shelfY)
 		if pile.Parent == nil then
 			pile.Parent = earth
 		end
@@ -879,6 +1023,37 @@ local function build()
 		local use = prompt(pile, "Pick up", material.name)
 		caches[material.id] = { part = pile, prompt = use }
 	end
+
+	-- Oxygen standalone display (life support pedestal)
+	local o2X = depotX
+	local o2Z = rackCenters[4].z - rackSpacing
+	part(earth, "O2Stand", Vector3.new(2.5, 0.8, 2.5),
+		CFrame.new(o2X, 0.4, o2Z), hullAlt, SP)
+	part(earth, "O2StandGlow", Vector3.new(2.5, 0.06, 2.5),
+		CFrame.new(o2X, 0.81, o2Z), hexColor("#d45d4a"), Enum.Material.Neon).Transparency = 0.4
+	local o2Sign = part(earth, "O2Label", Vector3.new(2.5, 0.4, 0.05),
+		CFrame.new(o2X, 1.5, o2Z + 1.3), accent, SP)
+	local o2sg = Instance.new("SurfaceGui")
+	o2sg.Face = Enum.NormalId.Front
+	o2sg.SizingMode = Enum.SurfaceGuiSizingMode.PixelsPerStud
+	o2sg.PixelsPerStud = 40
+	o2sg.Parent = o2Sign
+	local o2lbl = Instance.new("TextLabel")
+	o2lbl.Size = UDim2.fromScale(1, 1)
+	o2lbl.BackgroundTransparency = 1
+	o2lbl.Font = Enum.Font.GothamBold
+	o2lbl.TextColor3 = hull
+	o2lbl.TextScaled = true
+	o2lbl.Text = "LIFE SUPPORT"
+	o2lbl.Parent = o2sg
+
+	local o2Mat = Catalog.materialById("oxygen")
+	local o2Pile = materialShape(o2Mat, o2X, o2Z, 0.81)
+	if o2Pile.Parent == nil then o2Pile.Parent = earth end
+	o2Pile:SetAttribute("MaterialId", "oxygen")
+	o2Pile.CastShadow = true
+	local o2Use = prompt(o2Pile, "Pick up", o2Mat.name)
+	caches["oxygen"] = { part = o2Pile, prompt = o2Use }
 
 	-- ── Build pads ───────────────────────────────────────────────────────
 	-- Three pads inside/near the workshop
@@ -929,9 +1104,12 @@ local function build()
 	end
 
 	-- Build bench (interaction point)
+	-- Build console (station-style workbench)
 	local bench = part(earth, "Bench", Vector3.new(24, 1, 6),
-		CFrame.new(-5, 0.5, -20),
-		Color3.fromRGB(50, 42, 34), Enum.Material.WoodPlanks)
+		CFrame.new(-5, 0.5, habZ), hullAlt, SP)
+	local benchSurface = part(earth, "BenchGlow", Vector3.new(24, 0.06, 6),
+		CFrame.new(-5, 1.03, habZ), accent, Enum.Material.Neon)
+	benchSurface.Transparency = 0.6
 	local buildPrompt = prompt(bench, "Build", "Suit")
 
 	-- ── Planet destinations ──────────────────────────────────────────────
