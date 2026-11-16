@@ -283,6 +283,147 @@ local function show(target)
 	current = target
 end
 
+-- ── Collapsible toggle ─────────────────────────────────────────────────
+-- Adds a small collapse/expand button that sits inside the top of a panel.
+-- Collapsed = panel shrinks to 36px tall, content hidden by ClipsDescendants.
+-- Expanded = panel returns to its original size.
+-- Nothing about page(), show(), clear(), or render functions changes.
+
+local collapseStates = {} -- tracks which panels are collapsed
+
+local function makeCollapsible(panel, titleText)
+	panel.ClipsDescendants = true
+
+	-- Save the original size so we can restore it
+	local expandedSize = panel.Size
+
+	-- Toggle button: lives INSIDE the panel at top-right, high ZIndex so it stays visible when collapsed
+	local toggle = Instance.new("TextButton")
+	toggle.Name = "CollapseToggle"
+	toggle.Size = UDim2.new(0, 36, 0, 24)
+	toggle.Position = UDim2.new(1, -36, 0, 0)
+	toggle.AnchorPoint = Vector2.new(0, 0)
+	toggle.BackgroundColor3 = BG_CARD
+	toggle.BackgroundTransparency = 0.3
+	toggle.FontFace = FONT_TITLE
+	toggle.TextSize = 14
+	toggle.TextColor3 = ACCENT
+	toggle.Text = "—"
+	toggle.ZIndex = 10
+	toggle.AutoButtonColor = false
+	toggle.BorderSizePixel = 0
+	corner(toggle, 4)
+	toggle.Parent = panel
+
+	-- Title label shown when collapsed
+	local collapseTitle = Instance.new("TextLabel")
+	collapseTitle.Name = "CollapseTitle"
+	collapseTitle.Size = UDim2.new(1, -44, 0, 24)
+	collapseTitle.Position = UDim2.new(0, 0, 0, 0)
+	collapseTitle.BackgroundTransparency = 1
+	collapseTitle.FontFace = FONT_TITLE
+	collapseTitle.TextSize = 11
+	collapseTitle.TextColor3 = ACCENT
+	collapseTitle.TextXAlignment = Enum.TextXAlignment.Left
+	collapseTitle.Text = titleText
+	collapseTitle.ZIndex = 10
+	collapseTitle.Visible = false
+	collapseTitle.Parent = panel
+
+	local collapsed = false
+	collapseStates[panel] = false
+
+	toggle.MouseButton1Click:Connect(function()
+		collapsed = not collapsed
+		collapseStates[panel] = collapsed
+		if collapsed then
+			panel.Size = UDim2.new(expandedSize.X.Scale, expandedSize.X.Offset, 0, 36)
+			panel.AutomaticCanvasSize = Enum.AutomaticSize.None
+			panel.CanvasSize = UDim2.new(0, 0, 0, 0)
+			panel.ScrollBarThickness = 0
+			toggle.Text = "+"
+			collapseTitle.Visible = true
+		else
+			panel.Size = expandedSize
+			panel.AutomaticCanvasSize = Enum.AutomaticSize.Y
+			panel.ScrollBarThickness = 3
+			toggle.Text = "—"
+			collapseTitle.Visible = false
+		end
+	end)
+
+	-- Hover effect
+	toggle.MouseEnter:Connect(function()
+		TweenService:Create(toggle, TweenInfo.new(0.1), {BackgroundTransparency = 0}):Play()
+	end)
+	toggle.MouseLeave:Connect(function()
+		TweenService:Create(toggle, TweenInfo.new(0.1), {BackgroundTransparency = 0.3}):Play()
+	end)
+end
+
+-- Same idea for the HUD Frame (not a ScrollingFrame, uses AutomaticSize instead)
+local function makeCollapsibleFrame(frame, titleText)
+	frame.ClipsDescendants = true
+
+	local expandedSize = frame.Size
+	local expandedAutoSize = frame.AutomaticSize
+
+	local toggle = Instance.new("TextButton")
+	toggle.Name = "CollapseToggle"
+	toggle.Size = UDim2.new(0, 36, 0, 24)
+	toggle.Position = UDim2.new(1, -36, 0, 0)
+	toggle.AnchorPoint = Vector2.new(0, 0)
+	toggle.BackgroundColor3 = BG_CARD
+	toggle.BackgroundTransparency = 0.3
+	toggle.FontFace = FONT_TITLE
+	toggle.TextSize = 14
+	toggle.TextColor3 = ACCENT
+	toggle.Text = "—"
+	toggle.ZIndex = 10
+	toggle.AutoButtonColor = false
+	toggle.BorderSizePixel = 0
+	corner(toggle, 4)
+	toggle.Parent = frame
+
+	local collapseTitle = Instance.new("TextLabel")
+	collapseTitle.Name = "CollapseTitle"
+	collapseTitle.Size = UDim2.new(1, -44, 0, 24)
+	collapseTitle.Position = UDim2.new(0, 0, 0, 0)
+	collapseTitle.BackgroundTransparency = 1
+	collapseTitle.FontFace = FONT_TITLE
+	collapseTitle.TextSize = 11
+	collapseTitle.TextColor3 = ACCENT
+	collapseTitle.TextXAlignment = Enum.TextXAlignment.Left
+	collapseTitle.Text = titleText
+	collapseTitle.ZIndex = 10
+	collapseTitle.Visible = false
+	collapseTitle.Parent = frame
+
+	local collapsed = false
+
+	toggle.MouseButton1Click:Connect(function()
+		collapsed = not collapsed
+		if collapsed then
+			frame.AutomaticSize = Enum.AutomaticSize.None
+			frame.Size = UDim2.new(expandedSize.X.Scale, expandedSize.X.Offset, 0, 36)
+			toggle.Text = "+"
+			collapseTitle.Visible = true
+		else
+			frame.Size = expandedSize
+			frame.AutomaticSize = expandedAutoSize
+			toggle.Text = "—"
+			collapseTitle.Visible = false
+		end
+	end)
+
+	toggle.MouseEnter:Connect(function()
+		TweenService:Create(toggle, TweenInfo.new(0.1), {BackgroundTransparency = 0}):Play()
+	end)
+	toggle.MouseLeave:Connect(function()
+		TweenService:Create(toggle, TweenInfo.new(0.1), {BackgroundTransparency = 0.3}):Play()
+	end)
+end
+
 -- ── Intro ───────────────────────────────────────────────────────────────
 local intro = page("Intro")
 
@@ -353,6 +494,7 @@ local openBuild = btn(noteContent, "Open Workshop", true)
 
 -- ── Workshop ────────────────────────────────────────────────────────────
 local workshop = page("Workshop", true)
+makeCollapsible(workshop, "SUIT WORKSHOP")
 
 local function designFrom(d)
 	if d == nil then return Design.emptyDesign() end
@@ -640,6 +782,7 @@ end)
 
 -- ── Planets ─────────────────────────────────────────────────────────────
 planets = page("Planets", true)
+makeCollapsible(planets, "DESTINATIONS")
 
 local difficulty -- forward declaration; assigned after renderPlanets
 local DEMO_MODE = true
@@ -752,6 +895,7 @@ end
 
 -- ── Difficulty / Briefing ───────────────────────────────────────────────
 difficulty = page("Difficulty", true)
+makeCollapsible(difficulty, "MISSION BRIEFING")
 
 function renderDifficulty()
 	clear(difficulty)
@@ -853,6 +997,8 @@ stroke(hud, BORDER, 1, 0.5)
 pad(hud, 10, 10, 10, 10)
 listLayout(hud, 4)
 hud.Parent = gui
+
+makeCollapsibleFrame(hud, "MISSION")
 
 local hudTitle = label(hud, "MISSION", 10, ACCENT, FONT_TITLE)
 local hudPlanet = label(hud, "", 16, TEXT_WHITE, FONT_TITLE)
