@@ -261,7 +261,7 @@ local function page(name, isPanel)
 	end
 	p.CanvasSize = UDim2.new(0, 0, 0, 0)
 	p.AutomaticCanvasSize = Enum.AutomaticSize.Y
-	p.ScrollBarThickness = 3
+	p.ScrollBarThickness = 6
 	p.ScrollBarImageColor3 = ACCENT
 	p.BackgroundColor3 = BG
 	p.BackgroundTransparency = if isPanel then 0.05 else 0
@@ -340,7 +340,7 @@ local function makeCollapsible(panel, titleText)
 		else
 			panel.Size = expandedSize
 			panel.AutomaticCanvasSize = Enum.AutomaticSize.Y
-			panel.ScrollBarThickness = 3
+			panel.ScrollBarThickness = 6
 			toggle.Text = "-"
 			titleLabel.TextColor3 = TEXT_FAINT
 		end
@@ -358,7 +358,8 @@ end
 local function makeCollapsibleFrame(frame, titleText)
 	frame.ClipsDescendants = true
 	local expandedSize = frame.Size
-	local expandedAutoSize = frame.AutomaticSize
+	local isScrolling = frame:IsA("ScrollingFrame")
+	local expandedAutoSize = if isScrolling then nil else frame.AutomaticSize
 
 	local header = Instance.new("Frame")
 	header.Name = "CollapseHeader"
@@ -396,13 +397,24 @@ local function makeCollapsibleFrame(frame, titleText)
 	toggle.MouseButton1Click:Connect(function()
 		collapsed = not collapsed
 		if collapsed then
-			frame.AutomaticSize = Enum.AutomaticSize.None
+			if isScrolling then
+				frame.AutomaticCanvasSize = Enum.AutomaticSize.None
+				frame.CanvasSize = UDim2.new(0, 0, 0, 0)
+				frame.ScrollBarThickness = 0
+			else
+				frame.AutomaticSize = Enum.AutomaticSize.None
+			end
 			frame.Size = UDim2.new(expandedSize.X.Scale, expandedSize.X.Offset, 0, 44)
 			toggle.Text = "+"
 			titleLabel.TextColor3 = ACCENT
 		else
 			frame.Size = expandedSize
-			frame.AutomaticSize = expandedAutoSize
+			if isScrolling then
+				frame.AutomaticCanvasSize = Enum.AutomaticSize.Y
+				frame.ScrollBarThickness = 4
+			else
+				frame.AutomaticSize = expandedAutoSize
+			end
 			toggle.Text = "-"
 			titleLabel.TextColor3 = TEXT_FAINT
 		end
@@ -638,8 +650,76 @@ function renderWorkshop()
 	local o2Card = card(workshop, false)
 	label(o2Card, "OXYGEN", 10, TEXT_FAINT, FONT_TITLE)
 	local oxygenAvail = state.inventory.oxygen or 0
+	local tankKg = design.oxygenKg * Design.TANK_KG_PER_OXYGEN_KG
+	local totalO2Kg = design.oxygenKg + tankKg
 	label(o2Card, string.format("Packed: %.1f kg  /  Available: %.1f kg", design.oxygenKg, oxygenAvail), 12, TEXT_WHITE, FONT_MONO)
+	label(o2Card, string.format("Tank hardware: %.1f kg  |  Total: %.1f kg", tankKg, totalO2Kg), 11, TEXT_DIM, FONT_MONO)
 	if oxygenAvail > 0 then
+		-- Increment / decrement row
+		local o2Row = Instance.new("Frame")
+		o2Row.Size = UDim2.new(1, 0, 0, 36)
+		o2Row.BackgroundTransparency = 1
+		o2Row.Parent = o2Card
+
+		local minus = Instance.new("TextButton")
+		minus.Size = UDim2.new(0, 44, 1, 0)
+		minus.Position = UDim2.new(0, 0, 0, 0)
+		minus.BackgroundColor3 = BG_CARD
+		minus.FontFace = FONT_TITLE
+		minus.TextSize = 18
+		minus.TextColor3 = ACCENT
+		minus.Text = "-"
+		minus.AutoButtonColor = false
+		minus.BorderSizePixel = 0
+		corner(minus, 6)
+		stroke(minus, ACCENT, 1, 0.7)
+		minus.Parent = o2Row
+
+		local o2Display = Instance.new("TextLabel")
+		o2Display.Size = UDim2.new(1, -100, 1, 0)
+		o2Display.Position = UDim2.new(0, 50, 0, 0)
+		o2Display.BackgroundTransparency = 1
+		o2Display.FontFace = FONT_MONO
+		o2Display.TextSize = 16
+		o2Display.TextColor3 = TEXT_WHITE
+		o2Display.Text = string.format("%.1f kg", design.oxygenKg)
+		o2Display.Parent = o2Row
+
+		local plus = Instance.new("TextButton")
+		plus.Size = UDim2.new(0, 44, 1, 0)
+		plus.Position = UDim2.new(1, -44, 0, 0)
+		plus.BackgroundColor3 = BG_CARD
+		plus.FontFace = FONT_TITLE
+		plus.TextSize = 18
+		plus.TextColor3 = ACCENT
+		plus.Text = "+"
+		plus.AutoButtonColor = false
+		plus.BorderSizePixel = 0
+		corner(plus, 6)
+		stroke(plus, ACCENT, 1, 0.7)
+		plus.Parent = o2Row
+
+		local O2_STEP = 0.5
+		minus.MouseButton1Click:Connect(function()
+			SetOxygen:FireServer(math.max(0, design.oxygenKg - O2_STEP))
+		end)
+		plus.MouseButton1Click:Connect(function()
+			SetOxygen:FireServer(math.min(oxygenAvail, design.oxygenKg + O2_STEP))
+		end)
+
+		minus.MouseEnter:Connect(function()
+			TweenService:Create(minus, TweenInfo.new(0.1), {BackgroundColor3 = BG_CARD_HOV}):Play()
+		end)
+		minus.MouseLeave:Connect(function()
+			TweenService:Create(minus, TweenInfo.new(0.1), {BackgroundColor3 = BG_CARD}):Play()
+		end)
+		plus.MouseEnter:Connect(function()
+			TweenService:Create(plus, TweenInfo.new(0.1), {BackgroundColor3 = BG_CARD_HOV}):Play()
+		end)
+		plus.MouseLeave:Connect(function()
+			TweenService:Create(plus, TweenInfo.new(0.1), {BackgroundColor3 = BG_CARD}):Play()
+		end)
+
 		local packAll = btn(o2Card, "Pack all oxygen", false)
 		packAll.Size = UDim2.new(1, 0, 0, 32)
 		packAll.MouseButton1Click:Connect(function()
@@ -970,16 +1050,19 @@ function renderDifficulty()
 end
 
 -- ── HUD ─────────────────────────────────────────────────────────────────
-local hud = Instance.new("Frame")
+local hud = Instance.new("ScrollingFrame")
 hud.Name = "HUD"
 if IS_MOBILE then
-	hud.Size = UDim2.new(1, -16, 0, 0)
+	hud.Size = UDim2.new(1, -16, 0.85, 0)
 	hud.Position = UDim2.new(0, 8, 0, 8)
 else
-	hud.Size = UDim2.new(0, 260, 0, 0)
+	hud.Size = UDim2.new(0, 260, 0.7, 0)
 	hud.Position = UDim2.new(1, -276, 0, 16)
 end
-hud.AutomaticSize = Enum.AutomaticSize.Y
+hud.CanvasSize = UDim2.new(0, 0, 0, 0)
+hud.AutomaticCanvasSize = Enum.AutomaticSize.Y
+hud.ScrollBarThickness = 4
+hud.ScrollBarImageColor3 = ACCENT
 hud.BackgroundColor3 = BG_PANEL
 hud.BackgroundTransparency = 0.15
 hud.BorderSizePixel = 0
