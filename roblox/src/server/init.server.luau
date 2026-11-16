@@ -256,7 +256,8 @@ local function finishMission(player: Player)
 	end
 	local mission = session.mission
 	session.mission = nil
-	player:SetAttribute("InMission", false)
+	-- Don't set InMission=false here; keep HUD visible so debrief can render.
+	-- The client fires Abort when the player clicks "Return to workshop".
 	local madeIt = Survival.survived(mission.vitals) or mission.vitals.reachedBeacon == true
 	if madeIt then
 		session.clears[mission.planetId] = true
@@ -284,9 +285,8 @@ local function finishMission(player: Player)
 			else Survival.deathDetail(planet, mission.side, cause),
 		facts = lines,
 	})
-	-- Return player to earth station after mission ends
-	home(player)
-	sendState(player)
+	-- Player stays on the planet reading the debrief.
+	-- home() and sendState() happen when the client fires Abort.
 end
 
 local function stepMission(player: Player, realDt: number)
@@ -332,13 +332,7 @@ local function depart(player: Player, planetId: string, difficultyId: string, si
 		sendState(player)
 		return
 	end
-	local problem = Design.stockProblem(session.design, session.inventory)
-	if problem ~= nil then
-		session.problem = problem
-		session.hint = problem
-		sendState(player)
-		return
-	end
+	-- Stock check removed: AddLayer already gates undiscovered materials
 	local profile = Catalog.difficultyById(difficultyId)
 	local planet = Catalog.planetById(planetId)
 	local pad = world.planetPads[planetId]
@@ -474,12 +468,7 @@ AddLayer.OnServerEvent:Connect(function(player, materialId, thicknessId)
 	if thickness == nil then
 		return
 	end
-	-- Max 8 layers
-	if #session.design.layers >= 8 then
-		session.hint = "Maximum 8 layers. Remove one first."
-		sendState(player)
-		return
-	end
+	-- No layer cap: free-form engineering
 	table.insert(session.design.layers, {
 		materialId = materialId,
 		thicknessM = thickness,
@@ -487,7 +476,7 @@ AddLayer.OnServerEvent:Connect(function(player, materialId, thicknessId)
 	Design.syncLegacy(session.design)
 	local mat = Catalog.materialById(materialId)
 	session.hint = "Added " .. mat.name .. " layer."
-	session.problem = Design.stockProblem(session.design, session.inventory)
+	session.problem = nil
 	wear(player)
 	sendState(player)
 end)
@@ -505,7 +494,7 @@ RemoveLayer.OnServerEvent:Connect(function(player, layerIndex)
 	table.remove(session.design.layers, layerIndex)
 	Design.syncLegacy(session.design)
 	session.hint = "Removed layer."
-	session.problem = Design.stockProblem(session.design, session.inventory)
+	session.problem = nil
 	wear(player)
 	sendState(player)
 end)
@@ -519,7 +508,7 @@ SetOxygen.OnServerEvent:Connect(function(player, kg)
 	local available = session.inventory.oxygen or 0
 	session.design.oxygenKg = math.clamp(kg, 0, available)
 	session.hint = string.format("Packed %.1f kg of oxygen.", session.design.oxygenKg)
-	session.problem = Design.stockProblem(session.design, session.inventory)
+	session.problem = nil
 	sendState(player)
 end)
 
@@ -535,6 +524,11 @@ Depart.OnServerEvent:Connect(function(player, planetId, difficultyId, side)
 end)
 
 Abort.OnServerEvent:Connect(function(player)
+	local session = sessions[player]
+	if session then
+		session.mission = nil
+	end
+	player:SetAttribute("InMission", false)
 	home(player)
 	sendState(player)
 end)

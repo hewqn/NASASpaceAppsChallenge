@@ -235,7 +235,8 @@ end
 
 local function clear(frame)
 	for _, child in frame:GetChildren() do
-		if not child:IsA("UIListLayout") and not child:IsA("UIPadding") and not child:IsA("UICorner") and not child:IsA("UIStroke") then
+		if not child:IsA("UIListLayout") and not child:IsA("UIPadding") and not child:IsA("UICorner") and not child:IsA("UIStroke")
+			and child.Name ~= "CollapseHeader" then
 			child:Destroy()
 		end
 	end
@@ -260,7 +261,7 @@ local function page(name, isPanel)
 	end
 	p.CanvasSize = UDim2.new(0, 0, 0, 0)
 	p.AutomaticCanvasSize = Enum.AutomaticSize.Y
-	p.ScrollBarThickness = 3
+	p.ScrollBarThickness = 6
 	p.ScrollBarImageColor3 = ACCENT
 	p.BackgroundColor3 = BG
 	p.BackgroundTransparency = if isPanel then 0.05 else 0
@@ -281,6 +282,150 @@ local function show(target)
 	if current then current.Visible = false end
 	if target then target.Visible = true end
 	current = target
+end
+
+-- ── Collapsible toggle ─────────────────────────────────────────────────
+-- Adds a header bar (works with UIListLayout) at the top of a panel.
+-- The bar has a title and a collapse/expand button.
+-- Collapsed = panel shrinks to ~44px, content hidden by ClipsDescendants.
+-- clear() skips children named "CollapseHeader" so the bar survives re-renders.
+
+local function makeCollapsible(panel, titleText)
+	panel.ClipsDescendants = true
+	local expandedSize = panel.Size
+
+	-- Header bar: a Frame child of the panel, LayoutOrder -999999 so UIListLayout puts it first
+	local header = Instance.new("Frame")
+	header.Name = "CollapseHeader"
+	header.Size = UDim2.new(1, 0, 0, 24)
+	header.BackgroundTransparency = 1
+	header.LayoutOrder = -999999
+	header.Parent = panel
+
+	local titleLabel = Instance.new("TextLabel")
+	titleLabel.Size = UDim2.new(1, -32, 1, 0)
+	titleLabel.BackgroundTransparency = 1
+	titleLabel.FontFace = FONT_TITLE
+	titleLabel.TextSize = 11
+	titleLabel.TextColor3 = TEXT_FAINT
+	titleLabel.TextXAlignment = Enum.TextXAlignment.Left
+	titleLabel.Text = titleText
+	titleLabel.Parent = header
+
+	local toggle = Instance.new("TextButton")
+	toggle.Size = UDim2.new(0, 28, 0, 24)
+	toggle.Position = UDim2.new(1, -28, 0, 0)
+	toggle.BackgroundColor3 = BG_CARD
+	toggle.BackgroundTransparency = 0.3
+	toggle.FontFace = FONT_TITLE
+	toggle.TextSize = 16
+	toggle.TextColor3 = ACCENT
+	toggle.Text = "-"
+	toggle.AutoButtonColor = false
+	toggle.BorderSizePixel = 0
+	corner(toggle, 4)
+	toggle.Parent = header
+
+	local collapsed = false
+
+	toggle.MouseButton1Click:Connect(function()
+		collapsed = not collapsed
+		if collapsed then
+			panel.Size = UDim2.new(expandedSize.X.Scale, expandedSize.X.Offset, 0, 44)
+			panel.AutomaticCanvasSize = Enum.AutomaticSize.None
+			panel.CanvasSize = UDim2.new(0, 0, 0, 0)
+			panel.ScrollBarThickness = 0
+			toggle.Text = "+"
+			titleLabel.TextColor3 = ACCENT
+		else
+			panel.Size = expandedSize
+			panel.AutomaticCanvasSize = Enum.AutomaticSize.Y
+			panel.ScrollBarThickness = 6
+			toggle.Text = "-"
+			titleLabel.TextColor3 = TEXT_FAINT
+		end
+	end)
+
+	toggle.MouseEnter:Connect(function()
+		TweenService:Create(toggle, TweenInfo.new(0.1), {BackgroundTransparency = 0}):Play()
+	end)
+	toggle.MouseLeave:Connect(function()
+		TweenService:Create(toggle, TweenInfo.new(0.1), {BackgroundTransparency = 0.3}):Play()
+	end)
+end
+
+-- Same idea for the HUD Frame (not a ScrollingFrame, uses AutomaticSize)
+local function makeCollapsibleFrame(frame, titleText)
+	frame.ClipsDescendants = true
+	local expandedSize = frame.Size
+	local isScrolling = frame:IsA("ScrollingFrame")
+	local expandedAutoSize = if isScrolling then nil else frame.AutomaticSize
+
+	local header = Instance.new("Frame")
+	header.Name = "CollapseHeader"
+	header.Size = UDim2.new(1, 0, 0, 24)
+	header.BackgroundTransparency = 1
+	header.LayoutOrder = -999999
+	header.Parent = frame
+
+	local titleLabel = Instance.new("TextLabel")
+	titleLabel.Size = UDim2.new(1, -32, 1, 0)
+	titleLabel.BackgroundTransparency = 1
+	titleLabel.FontFace = FONT_TITLE
+	titleLabel.TextSize = 11
+	titleLabel.TextColor3 = TEXT_FAINT
+	titleLabel.TextXAlignment = Enum.TextXAlignment.Left
+	titleLabel.Text = titleText
+	titleLabel.Parent = header
+
+	local toggle = Instance.new("TextButton")
+	toggle.Size = UDim2.new(0, 28, 0, 24)
+	toggle.Position = UDim2.new(1, -28, 0, 0)
+	toggle.BackgroundColor3 = BG_CARD
+	toggle.BackgroundTransparency = 0.3
+	toggle.FontFace = FONT_TITLE
+	toggle.TextSize = 16
+	toggle.TextColor3 = ACCENT
+	toggle.Text = "-"
+	toggle.AutoButtonColor = false
+	toggle.BorderSizePixel = 0
+	corner(toggle, 4)
+	toggle.Parent = header
+
+	local collapsed = false
+
+	toggle.MouseButton1Click:Connect(function()
+		collapsed = not collapsed
+		if collapsed then
+			if isScrolling then
+				frame.AutomaticCanvasSize = Enum.AutomaticSize.None
+				frame.CanvasSize = UDim2.new(0, 0, 0, 0)
+				frame.ScrollBarThickness = 0
+			else
+				frame.AutomaticSize = Enum.AutomaticSize.None
+			end
+			frame.Size = UDim2.new(expandedSize.X.Scale, expandedSize.X.Offset, 0, 44)
+			toggle.Text = "+"
+			titleLabel.TextColor3 = ACCENT
+		else
+			frame.Size = expandedSize
+			if isScrolling then
+				frame.AutomaticCanvasSize = Enum.AutomaticSize.Y
+				frame.ScrollBarThickness = 4
+			else
+				frame.AutomaticSize = expandedAutoSize
+			end
+			toggle.Text = "-"
+			titleLabel.TextColor3 = TEXT_FAINT
+		end
+	end)
+
+	toggle.MouseEnter:Connect(function()
+		TweenService:Create(toggle, TweenInfo.new(0.1), {BackgroundTransparency = 0}):Play()
+	end)
+	toggle.MouseLeave:Connect(function()
+		TweenService:Create(toggle, TweenInfo.new(0.1), {BackgroundTransparency = 0.3}):Play()
+	end)
 end
 
 -- ── Intro ───────────────────────────────────────────────────────────────
@@ -353,6 +498,7 @@ local openBuild = btn(noteContent, "Open Workshop", true)
 
 -- ── Workshop ────────────────────────────────────────────────────────────
 local workshop = page("Workshop", true)
+makeCollapsible(workshop, "SUIT WORKSHOP")
 
 local function designFrom(d)
 	if d == nil then return Design.emptyDesign() end
@@ -504,8 +650,76 @@ function renderWorkshop()
 	local o2Card = card(workshop, false)
 	label(o2Card, "OXYGEN", 10, TEXT_FAINT, FONT_TITLE)
 	local oxygenAvail = state.inventory.oxygen or 0
+	local tankKg = design.oxygenKg * Design.TANK_KG_PER_OXYGEN_KG
+	local totalO2Kg = design.oxygenKg + tankKg
 	label(o2Card, string.format("Packed: %.1f kg  /  Available: %.1f kg", design.oxygenKg, oxygenAvail), 12, TEXT_WHITE, FONT_MONO)
+	label(o2Card, string.format("Tank hardware: %.1f kg  |  Total: %.1f kg", tankKg, totalO2Kg), 11, TEXT_DIM, FONT_MONO)
 	if oxygenAvail > 0 then
+		-- Increment / decrement row
+		local o2Row = Instance.new("Frame")
+		o2Row.Size = UDim2.new(1, 0, 0, 36)
+		o2Row.BackgroundTransparency = 1
+		o2Row.Parent = o2Card
+
+		local minus = Instance.new("TextButton")
+		minus.Size = UDim2.new(0, 44, 1, 0)
+		minus.Position = UDim2.new(0, 0, 0, 0)
+		minus.BackgroundColor3 = BG_CARD
+		minus.FontFace = FONT_TITLE
+		minus.TextSize = 18
+		minus.TextColor3 = ACCENT
+		minus.Text = "-"
+		minus.AutoButtonColor = false
+		minus.BorderSizePixel = 0
+		corner(minus, 6)
+		stroke(minus, ACCENT, 1, 0.7)
+		minus.Parent = o2Row
+
+		local o2Display = Instance.new("TextLabel")
+		o2Display.Size = UDim2.new(1, -100, 1, 0)
+		o2Display.Position = UDim2.new(0, 50, 0, 0)
+		o2Display.BackgroundTransparency = 1
+		o2Display.FontFace = FONT_MONO
+		o2Display.TextSize = 16
+		o2Display.TextColor3 = TEXT_WHITE
+		o2Display.Text = string.format("%.1f kg", design.oxygenKg)
+		o2Display.Parent = o2Row
+
+		local plus = Instance.new("TextButton")
+		plus.Size = UDim2.new(0, 44, 1, 0)
+		plus.Position = UDim2.new(1, -44, 0, 0)
+		plus.BackgroundColor3 = BG_CARD
+		plus.FontFace = FONT_TITLE
+		plus.TextSize = 18
+		plus.TextColor3 = ACCENT
+		plus.Text = "+"
+		plus.AutoButtonColor = false
+		plus.BorderSizePixel = 0
+		corner(plus, 6)
+		stroke(plus, ACCENT, 1, 0.7)
+		plus.Parent = o2Row
+
+		local O2_STEP = 0.5
+		minus.MouseButton1Click:Connect(function()
+			SetOxygen:FireServer(math.max(0, design.oxygenKg - O2_STEP))
+		end)
+		plus.MouseButton1Click:Connect(function()
+			SetOxygen:FireServer(math.min(oxygenAvail, design.oxygenKg + O2_STEP))
+		end)
+
+		minus.MouseEnter:Connect(function()
+			TweenService:Create(minus, TweenInfo.new(0.1), {BackgroundColor3 = BG_CARD_HOV}):Play()
+		end)
+		minus.MouseLeave:Connect(function()
+			TweenService:Create(minus, TweenInfo.new(0.1), {BackgroundColor3 = BG_CARD}):Play()
+		end)
+		plus.MouseEnter:Connect(function()
+			TweenService:Create(plus, TweenInfo.new(0.1), {BackgroundColor3 = BG_CARD_HOV}):Play()
+		end)
+		plus.MouseLeave:Connect(function()
+			TweenService:Create(plus, TweenInfo.new(0.1), {BackgroundColor3 = BG_CARD}):Play()
+		end)
+
 		local packAll = btn(o2Card, "Pack all oxygen", false)
 		packAll.Size = UDim2.new(1, 0, 0, 32)
 		packAll.MouseButton1Click:Connect(function()
@@ -608,10 +822,8 @@ function renderWorkshop()
 	local statsCard = card(workshop, true)
 	label(statsCard, "SUIT SUMMARY", 10, TEXT_FAINT, FONT_TITLE)
 	local totalMass = Design.designMassKg(design)
-	local sealed = Design.isSealed(design)
 	label(statsCard, string.format("Total mass: %.1f kg", totalMass), 12, TEXT_WHITE, FONT_MONO)
-	label(statsCard, "Sealed: " .. (if sealed then "YES" else "NO (need a structural layer)"), 12, if sealed then SUCCESS else DANGER, FONT_MONO)
-	label(statsCard, string.format("Layers: %d / 8", #design.layers), 12, TEXT_DIM, FONT_MONO)
+	label(statsCard, string.format("Layers: %d", #design.layers), 12, TEXT_DIM, FONT_MONO)
 
 	-- Hint / problem
 	if state.problem ~= "" and state.problem ~= nil then
@@ -640,6 +852,7 @@ end)
 
 -- ── Planets ─────────────────────────────────────────────────────────────
 planets = page("Planets", true)
+makeCollapsible(planets, "DESTINATIONS")
 
 local difficulty -- forward declaration; assigned after renderPlanets
 local DEMO_MODE = true
@@ -752,6 +965,7 @@ end
 
 -- ── Difficulty / Briefing ───────────────────────────────────────────────
 difficulty = page("Difficulty", true)
+makeCollapsible(difficulty, "MISSION BRIEFING")
 
 function renderDifficulty()
 	clear(difficulty)
@@ -817,10 +1031,12 @@ function renderDifficulty()
 		hotBtn.MouseButton1Click:Connect(function()
 			warn("[CODAG Client] Firing Depart:", chosenPlanet, diffId, "hot")
 			DepartEvent:FireServer(chosenPlanet, diffId, "hot")
+			show(nil)
 		end)
 		coldBtn.MouseButton1Click:Connect(function()
 			warn("[CODAG Client] Firing Depart:", chosenPlanet, diffId, "cold")
 			DepartEvent:FireServer(chosenPlanet, diffId, "cold")
+			show(nil)
 		end)
 	end
 
@@ -834,16 +1050,19 @@ function renderDifficulty()
 end
 
 -- ── HUD ─────────────────────────────────────────────────────────────────
-local hud = Instance.new("Frame")
+local hud = Instance.new("ScrollingFrame")
 hud.Name = "HUD"
 if IS_MOBILE then
-	hud.Size = UDim2.new(1, -16, 0, 0)
+	hud.Size = UDim2.new(1, -16, 0.85, 0)
 	hud.Position = UDim2.new(0, 8, 0, 8)
 else
-	hud.Size = UDim2.new(0, 260, 0, 0)
+	hud.Size = UDim2.new(0, 260, 0.7, 0)
 	hud.Position = UDim2.new(1, -276, 0, 16)
 end
-hud.AutomaticSize = Enum.AutomaticSize.Y
+hud.CanvasSize = UDim2.new(0, 0, 0, 0)
+hud.AutomaticCanvasSize = Enum.AutomaticSize.Y
+hud.ScrollBarThickness = 4
+hud.ScrollBarImageColor3 = ACCENT
 hud.BackgroundColor3 = BG_PANEL
 hud.BackgroundTransparency = 0.15
 hud.BorderSizePixel = 0
@@ -853,6 +1072,8 @@ stroke(hud, BORDER, 1, 0.5)
 pad(hud, 10, 10, 10, 10)
 listLayout(hud, 4)
 hud.Parent = gui
+
+makeCollapsibleFrame(hud, "MISSION")
 
 local hudTitle = label(hud, "MISSION", 10, ACCENT, FONT_TITLE)
 local hudPlanet = label(hud, "", 16, TEXT_WHITE, FONT_TITLE)
@@ -883,6 +1104,10 @@ abortBtn.Size = UDim2.new(1, 0, 0, 32)
 abortBtn.TextColor3 = DANGER
 abortBtn.MouseButton1Click:Connect(function()
 	AbortEvent:FireServer()
+	clearDebrief()
+	hud.Visible = false
+	show(workshop)
+	renderWorkshop()
 end)
 
 local function clock(seconds: number): string
@@ -893,7 +1118,12 @@ end
 
 local function renderHud()
 	local inMission = player:GetAttribute("InMission")
-	hud.Visible = inMission == true
+	hud.Visible = inMission == true or debriefContainer.Visible
+
+	-- Hide all panels during a mission so only the HUD shows
+	if inMission then
+		show(nil)
+	end
 
 	if not inMission then return end
 
@@ -925,46 +1155,63 @@ player:GetAttributeChangedSignal("InMission"):Connect(renderHud)
 player:GetAttributeChangedSignal("MissionClock"):Connect(renderHud)
 player:GetAttributeChangedSignal("Alive"):Connect(renderHud)
 
--- ── Debrief ─────────────────────────────────────────────────────────────
-local debrief = page("Debrief")
+-- ── Debrief (appended into HUD) ─────────────────────────────────────────
+local debriefContainer = Instance.new("Frame")
+debriefContainer.Name = "DebriefContainer"
+debriefContainer.Size = UDim2.new(1, 0, 0, 0)
+debriefContainer.AutomaticSize = Enum.AutomaticSize.Y
+debriefContainer.BackgroundTransparency = 1
+debriefContainer.LayoutOrder = -99999
+debriefContainer.Visible = false
+debriefContainer.Parent = hud
+listLayout(debriefContainer, 6)
+
+local function clearDebrief()
+	for _, child in debriefContainer:GetChildren() do
+		if not child:IsA("UIListLayout") then
+			child:Destroy()
+		end
+	end
+	debriefContainer.Visible = false
+end
 
 DebriefEvent.OnClientEvent:Connect(function(report)
-	clear(debrief)
-	show(debrief)
+	clearDebrief()
+	debriefContainer.Visible = true
+	hud.Visible = true
+
+	divider(debriefContainer)
 
 	if report.survived then
-		label(debrief, "MISSION COMPLETE", 11, SUCCESS, FONT_TITLE)
-		label(debrief, "You survived.", 28, SUCCESS, FONT_DISPLAY)
+		label(debriefContainer, "MISSION COMPLETE", 11, SUCCESS, FONT_TITLE)
+		label(debriefContainer, "You survived.", 18, SUCCESS, FONT_DISPLAY)
 	else
-		label(debrief, "MISSION FAILED", 11, DANGER, FONT_TITLE)
-		label(debrief, report.title, 24, TEXT_WHITE, FONT_DISPLAY)
+		label(debriefContainer, "MISSION FAILED", 11, DANGER, FONT_TITLE)
+		label(debriefContainer, report.title, 16, TEXT_WHITE, FONT_DISPLAY)
 	end
 
-	divider(debrief)
+	label(debriefContainer, report.detail, 12, TEXT_DIM)
 
-	label(debrief, report.detail, 13, TEXT_DIM)
-
-	divider(debrief)
-
-	-- NASA fact cards
 	if report.facts then
-		label(debrief, "FROM THE NASA FACT SHEETS", 10, TEXT_FAINT, FONT_TITLE)
-		label(debrief, "The physics that decided your fate. Every number below came from NSSDC, not from a model or an estimate.", 11, ACCENT)
+		divider(debriefContainer)
+		label(debriefContainer, "NASA FACT SHEETS", 10, TEXT_FAINT, FONT_TITLE)
 
 		for _, fact in report.facts do
-			local fc = card(debrief, false)
-			label(fc, fact.text, 12, TEXT_WHITE)
-			divider(fc)
-			label(fc, fact.body .. " Fact Sheet", 10, TEXT_FAINT, FONT_TITLE)
-			label(fc, fact.sourceUrl, 10, ACCENT, FONT_MONO)
+			local fc = card(debriefContainer, false)
+			label(fc, fact.text, 11, TEXT_WHITE)
+			label(fc, fact.body .. " Fact Sheet", 9, TEXT_FAINT, FONT_TITLE)
+			label(fc, fact.sourceUrl, 9, ACCENT, FONT_MONO)
 		end
 	end
 
-	divider(debrief)
+	divider(debriefContainer)
 
-	local again = btn(debrief, "Return to workshop", true)
-	again.Size = UDim2.new(1, 0, 0, 44)
+	local again = btn(debriefContainer, "Return to workshop", true)
+	again.Size = UDim2.new(1, 0, 0, 38)
 	again.MouseButton1Click:Connect(function()
+		AbortEvent:FireServer()
+		clearDebrief()
+		hud.Visible = false
 		show(workshop)
 		renderWorkshop()
 	end)
