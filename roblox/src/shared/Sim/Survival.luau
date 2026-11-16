@@ -74,20 +74,15 @@ local function exposure(planet, side: string)
 	return best
 end
 
--- Pressure safety factor using the outermost structural layer.
 local function shellSafetyFactor(design, outsidePa: number): number?
-	if not isSealed(design) then
+	if not isSealed(design) or design.shellMaterialId == nil then
 		return nil
 	end
-	local structural = Design.outerStructuralLayer(design)
-	if structural == nil then
-		return nil
-	end
-	local material = materialById(structural.materialId)
+	local material = materialById(design.shellMaterialId)
 	local earthPa = planetById("earth").referencePressure.value or 101400
 	local deltaPa = math.abs(outsidePa - earthPa)
-	local innerRadius = Design.outerStructuralRadius(design)
-	local stress = (deltaPa * innerRadius) / (2 * structural.thicknessM)
+	local radius = design.shellRadiusM - design.shellThicknessM
+	local stress = (deltaPa * radius) / (2 * design.shellThicknessM)
 	if stress <= 0 then
 		return math.huge
 	end
@@ -105,40 +100,22 @@ local function earthlikeComfort(planet, outsidePa: number, ambientK: number): bo
 		and ambientK <= HUMAN.comfortMaxK
 end
 
--- Heat flow through the layered suit.
--- Uses series thermal resistance for all layers.
 local function heatFlowW(design, sealed: boolean, outsidePa: number, bodyK: number, ambientK: number): number
 	local area = HUMAN.areaM2
-	-- No suit or unsealed in vacuum: pure radiative
 	if not sealed and outsidePa < 100 then
 		return HUMAN.emissivity * STEFAN_BOLTZMANN * area * (ambientK ^ 4 - bodyK ^ 4)
 	end
-	-- Check if any layer has melted (ambient above its melting point)
-	-- If so, skip melted layers in thermal calc
-	local totalR = Design.thermalResistance(design, outsidePa)
-	if totalR > 0 then
-		-- Check for melted outer layers
-		local effectiveR = 0
-		local r = Design.BASE_RADIUS_M
-		for _, layer in design.layers do
-			local mat = materialById(layer.materialId)
-			if ambientK < mat.meltingK then
-				local k = mat.conductivity
-				if mat.vacuumConductivity ~= nil and outsidePa < 1000 then
-					k = mat.vacuumConductivity
-				end
-				if k > 0 and layer.thicknessM > 0 then
-					local layerArea = 4 * math.pi * (r + layer.thicknessM / 2) ^ 2
-					effectiveR += layer.thicknessM / (k * layerArea)
-				end
-			end
-			r += layer.thicknessM
-		end
-		if effectiveR > 0 then
-			return (ambientK - bodyK) / effectiveR
-		end
+	local wrap = nil
+	if design.insulationMaterialId ~= nil and design.insulationThicknessM > 0 then
+		wrap = materialById(design.insulationMaterialId)
 	end
-	-- Fallback: no effective insulation
+	if sealed and wrap ~= nil and ambientK < wrap.meltingK then
+		return (wrap.conductivity * area * (ambientK - bodyK)) / design.insulationThicknessM
+	end
+	if sealed and design.shellMaterialId ~= nil and design.shellThicknessM > 0 then
+		local shell = materialById(design.shellMaterialId)
+		return (shell.conductivity * area * (ambientK - bodyK)) / design.shellThicknessM
+	end
 	return 10 * area * (ambientK - bodyK)
 end
 
@@ -167,20 +144,12 @@ local function stepVitals(vitals, design, planet, minSafetyFactor: number, side:
 		if vitals.elapsedS + dt >= VACUUM_FAIL_S then
 			cause = "pressure"
 		end
+	elseif sealed and design.shellMaterialId ~= nil and ambientK >= materialById(design.shellMaterialId).meltingK then
+		cause = "burn"
 	elseif sealed then
-		-- Check if outermost structural layer melts
-		local structural = Design.outerStructuralLayer(design)
-		if structural ~= nil then
-			local mat = materialById(structural.materialId)
-			if ambientK >= mat.meltingK then
-				cause = "burn"
-			end
-		end
-		if cause == nil then
-			local factor = shellSafetyFactor(design, outsidePa)
-			if factor ~= nil and factor < minSafetyFactor then
-				cause = "crush"
-			end
+		local factor = shellSafetyFactor(design, outsidePa)
+		if factor ~= nil and factor < minSafetyFactor then
+			cause = "crush"
 		end
 	end
 
@@ -251,7 +220,7 @@ local function deathDetail(planet, side: string, cause: string): string
 	end
 	local earthAir = "Your body is used to Earth: about "
 		.. string.format("%.0f", celsius(earthAverage))
-		.. " C, "
+		.. " °C, "
 		.. earth.referencePressure.transcribedFrom
 		.. ", and air that is "
 		.. string.format("%d", math.floor(oxygenFraction(earth) * 100 + 0.5))
@@ -269,7 +238,7 @@ local function deathDetail(planet, side: string, cause: string): string
 		return earthAir
 			.. " Your core climbed through "
 			.. string.format("%.0f", celsius(HUMAN.burnK))
-			.. " C. The place you stood was "
+			.. " °C. The place you stood was "
 			.. tostring(stay.kelvin)
 			.. " K. "
 			.. stay.transcribedFrom
@@ -277,7 +246,7 @@ local function deathDetail(planet, side: string, cause: string): string
 		return earthAir
 			.. " Your core fell through "
 			.. string.format("%.0f", celsius(HUMAN.freezeK))
-			.. " C. The place you stood was "
+			.. " °C. The place you stood was "
 			.. tostring(stay.kelvin)
 			.. " K. "
 			.. stay.transcribedFrom

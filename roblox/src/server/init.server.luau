@@ -17,9 +17,7 @@ local World = require(script.World)
 
 Catalog.assertFactSheetRecords(Catalog.PLANETS)
 
-warn("[CODAG Server] Script starting")
 local world = World.build()
-warn("[CODAG Server] World built")
 local earthG = Catalog.planetById("earth").gravityMs2
 local TIME_SCALE = 30
 
@@ -30,13 +28,6 @@ local function remote(name: string): RemoteEvent
 		folder.Name = "Remotes"
 		folder.Parent = shared
 	end
-	-- Reuse existing event so client references survive server restart (Rojo sync)
-	local existing = folder:FindFirstChild(name)
-	if existing and existing:IsA("RemoteEvent") then
-		warn("[CODAG Server] Reusing event:", name)
-		return existing
-	end
-	warn("[CODAG Server] Creating event:", name)
 	local event = Instance.new("RemoteEvent")
 	event.Name = name
 	event.Parent = folder
@@ -46,9 +37,9 @@ end
 local State = remote("State")
 local Ready = remote("Ready")
 local Debrief = remote("Debrief")
-local AddLayer = remote("AddLayer")
-local RemoveLayer = remote("RemoveLayer")
-local SetOxygen = remote("SetOxygen")
+local Place = remote("Place")
+local ClearSlot = remote("ClearSlot")
+local SetSize = remote("SetSize")
 local Depart = remote("Depart")
 local Abort = remote("Abort")
 
@@ -68,53 +59,15 @@ local function applyLook(planetId: string)
 	Lighting.Ambient = look.sky
 	Lighting.OutdoorAmbient = look.sky
 	Lighting.FogColor = look.sky
-	Lighting.FogStart = if planetId == "earth" then 9999 else 40
-	Lighting.FogEnd = if planetId == "earth" then 10000 else 180
-
-	local atmoConfig = world.atmo[planetId] or world.atmo.earth
-	local atmoInst = world.atmoInstance
-	if atmoInst then
-		atmoInst.Density = atmoConfig.density
-		atmoInst.Offset = atmoConfig.offset
-		atmoInst.Haze = atmoConfig.haze
-		atmoInst.Glare = atmoConfig.glare
-		atmoInst.Color = atmoConfig.color
-		atmoInst.Decay = atmoConfig.decay
-	end
-
-	local bloom = Lighting:FindFirstChild("CODAGBloom")
-	if bloom then
-		local airless = planetId == "moon" or planetId == "mercury"
-		bloom.Intensity = if airless then 0.6 else 0.4
-		bloom.Threshold = if airless then 0.8 else 0.9
-	end
-
-	local cc = Lighting:FindFirstChild("CODAGColor")
-	if cc then
-		if planetId == "venus" then
-			cc.TintColor = Color3.fromRGB(255, 230, 180)
-			cc.Saturation = 0.15
-		elseif planetId == "mars" then
-			cc.TintColor = Color3.fromRGB(255, 220, 200)
-			cc.Saturation = 0.1
-		elseif planetId == "neptune" or planetId == "uranus" then
-			cc.TintColor = Color3.fromRGB(220, 235, 255)
-			cc.Saturation = 0.05
-		else
-			cc.TintColor = Color3.fromRGB(255, 248, 240)
-			cc.Saturation = 0.08
-		end
-	end
+	Lighting.FogStart = if planetId == "earth" then 400 else 40
+	Lighting.FogEnd = if planetId == "earth" then 900 else 180
 end
 
 local function gravityFor(planetId: string): number
 	return Physics.gravityStuds(Catalog.planetById(planetId).gravityMs2, earthG)
 end
 
-local DEMO_MODE = true -- hackathon: all planets open
-
 local function unlocked(session, planetId: string): boolean
-	if DEMO_MODE then return true end
 	local previous = nil
 	for _, id in Sources.DESTINATION_ORDER do
 		if id == planetId then
@@ -125,24 +78,14 @@ local function unlocked(session, planetId: string): boolean
 	return false
 end
 
--- Send layer-based design to client
 local function publicDesign(design)
-	local layers = {}
-	for _, layer in design.layers do
-		table.insert(layers, {
-			materialId = layer.materialId,
-			thicknessM = layer.thicknessM,
-		})
-	end
-	-- Also send legacy fields for backward compat
 	return {
-		layers = layers,
+		shellMaterialId = design.shellMaterialId or "",
+		shellRadiusM = design.shellRadiusM,
+		shellThicknessM = design.shellThicknessM,
+		insulationMaterialId = design.insulationMaterialId or "",
+		insulationThicknessM = design.insulationThicknessM,
 		oxygenKg = design.oxygenKg,
-		shellMaterialId = Design.shellMaterialId(design) or "",
-		shellRadiusM = Design.outerRadiusM(design),
-		shellThicknessM = Design.shellThicknessM(design),
-		insulationMaterialId = "",
-		insulationThicknessM = 0,
 	}
 end
 
@@ -183,20 +126,16 @@ local function wear(player: Player)
 	local model = Instance.new("Model")
 	model.Name = "CODAGSuit"
 	model.Parent = character
-
-	-- Render each layer as a concentric sphere
-	local radius = Design.BASE_RADIUS_M
-	local baseScale = 4.2 -- studs for base radius
-	for i, layer in session.design.layers do
-		local mat = Catalog.materialById(layer.materialId)
-		radius += layer.thicknessM
-		local scale = radius / Design.BASE_RADIUS_M
+	local function shellPart(materialId: string?, scale: number, transparency: number)
+		if materialId == nil or materialId == "" then
+			return
+		end
 		local piece = Instance.new("Part")
-		piece.Name = mat.id .. "_" .. tostring(i)
+		piece.Name = materialId
 		piece.Shape = Enum.PartType.Ball
-		piece.Size = Vector3.new(baseScale, 5.4, baseScale) * scale
-		piece.Color = world.hexColor(mat.color)
-		piece.Transparency = 0.3 + (i * 0.08)
+		piece.Size = Vector3.new(4.2, 5.4, 4.2) * scale
+		piece.Color = world.hexColor(Catalog.materialById(materialId).color)
+		piece.Transparency = transparency
 		piece.CanCollide = false
 		piece.Massless = true
 		piece.CFrame = root.CFrame
@@ -206,8 +145,8 @@ local function wear(player: Player)
 		weld.Part1 = piece
 		weld.Parent = piece
 	end
-
-	-- Oxygen tank
+	shellPart(session.design.shellMaterialId, 1, 0.55)
+	shellPart(session.design.insulationMaterialId, 1.18, 0.45)
 	if session.design.oxygenKg > 0 then
 		local bottle = Instance.new("Part")
 		bottle.Name = "Oxygen"
@@ -257,7 +196,7 @@ local function finishMission(player: Player)
 	local mission = session.mission
 	session.mission = nil
 	player:SetAttribute("InMission", false)
-	local madeIt = Survival.survived(mission.vitals) or mission.vitals.reachedBeacon == true
+	local madeIt = Survival.survived(mission.vitals)
 	if madeIt then
 		session.clears[mission.planetId] = true
 	end
@@ -278,14 +217,12 @@ local function finishMission(player: Player)
 		difficultyId = mission.difficultyId,
 		side = mission.side,
 		survived = madeIt,
-		title = if madeIt then "You made it across " .. planet.name .. "." else Survival.deathTitle(cause),
+		title = if madeIt then "Twenty minutes on " .. planet.name .. "." else Survival.deathTitle(cause),
 		detail = if madeIt
-			then "You reached the beacon. Your suit held."
+			then "Your core stayed near 37 °C and you still had oxygen."
 			else Survival.deathDetail(planet, mission.side, cause),
 		facts = lines,
 	})
-	-- Return player to earth station after mission ends
-	home(player)
 	sendState(player)
 end
 
@@ -314,7 +251,7 @@ local function stepMission(player: Player, realDt: number)
 	player:SetAttribute("AirHeld", held)
 	player:SetAttribute("Alive", vitals.alive)
 	player:SetAttribute("CauseTitle", if vitals.cause then Survival.deathTitle(vitals.cause) else "")
-	if not vitals.alive or vitals.reachedBeacon or Survival.survived(vitals) then
+	if not vitals.alive or Survival.survived(vitals) then
 		finishMission(player)
 	end
 end
@@ -341,26 +278,66 @@ local function depart(player: Player, planetId: string, difficultyId: string, si
 	end
 	local profile = Catalog.difficultyById(difficultyId)
 	local planet = Catalog.planetById(planetId)
-	local pad = world.planetPads[planetId]
 	session.mission = {
 		planetId = planetId,
 		difficultyId = difficultyId,
 		side = side,
 		minSafetyFactor = profile.minSafetyFactor,
 		vitals = Survival.initialVitals(session.design),
-		lastCheckpoint = if pad then pad.CFrame + Vector3.new(0, 5, 0) else nil,
 	}
 	workspace.Gravity = gravityFor(planetId)
 	applyLook(planetId)
 	local character = player.Character
 	local root = character and character:FindFirstChild("HumanoidRootPart")
+	local pad = world.planetPads[planetId]
 	if root and pad then
-		root.CFrame = pad.CFrame + Vector3.new(0, 5, 0)
+		root.CFrame = pad.CFrame + Vector3.new(0, 8, 0)
 	end
 	player:SetAttribute("MissionPlanet", planet.name)
 	player:SetAttribute("MissionSide", side)
 	player:SetAttribute("MissionDifficulty", profile.label)
 	stepMission(player, 0)
+end
+
+local function place(player: Player, materialId: string, slot: string)
+	local session = sessions[player]
+	if session == nil then
+		return
+	end
+	if (session.inventory[materialId] or 0) <= 0 then
+		session.hint = "You have not found that yet."
+		sendState(player)
+		return
+	end
+	local material = Catalog.materialById(materialId)
+	local design = session.design
+	if slot == "air" then
+		if materialId ~= "oxygen" then
+			session.hint = "Only the red bottles go on Air."
+		else
+			design.oxygenKg = session.inventory.oxygen or 0
+			session.hint = "Bottles packed. That is all the air you found."
+		end
+	elseif slot == "shell" then
+		if materialId == "oxygen" then
+			session.hint = "Bottles go on Air."
+		elseif not material.structural then
+			session.hint = material.name .. " cannot hold air. Put it on the wrap."
+		else
+			design.shellMaterialId = materialId
+			session.hint = material.name .. " is the hard shell. It keeps your air in."
+		end
+	elseif slot == "wrap" then
+		if materialId == "oxygen" or material.structural then
+			session.hint = if materialId == "oxygen" then "Bottles go on Air." else material.name .. " is hard. It belongs on the shell."
+		else
+			design.insulationMaterialId = materialId
+			session.hint = material.name .. " is the wrap. It slows the heat."
+		end
+	end
+	session.problem = Design.stockProblem(design, session.inventory)
+	wear(player)
+	sendState(player)
 end
 
 local function collect(player: Player, materialId: string)
@@ -376,7 +353,40 @@ local function collect(player: Player, materialId: string)
 	session.inventory[materialId] = material.foundKg
 	cache.prompt.Enabled = false
 	cache.part.Transparency = 0.75
-	session.hint = "Picked up " .. material.name .. "."
+	local token = cache.part:Clone()
+	token.Transparency = 0
+	token.Size = Vector3.new(3, 2, 3)
+	token.CFrame = world.pads.shell.CFrame * CFrame.new(0, 3, 6)
+	token.Anchored = true
+	token:SetAttribute("MaterialId", materialId)
+	local oldPrompt = token:FindFirstChildOfClass("ProximityPrompt")
+	if oldPrompt then
+		oldPrompt:Destroy()
+	end
+	token.Parent = world.bench
+	local homeCFrame = token.CFrame
+	local created, drag = pcall(function()
+		return Instance.new("DragDetector")
+	end)
+	if created and drag ~= nil then
+		drag.Parent = token
+		drag.DragEnd:Connect(function(who: Player)
+			local nearest = nil
+			local best = 12
+			for _, pad in pairs(world.pads) do
+				local distance = (pad.Position - token.Position).Magnitude
+				if distance < best then
+					nearest = pad
+					best = distance
+				end
+			end
+			token.CFrame = homeCFrame
+			if nearest ~= nil and typeof(who) == "Instance" then
+				place(who, materialId, nearest:GetAttribute("Slot"))
+			end
+		end)
+	end
+	session.hint = "Picked up " .. material.name .. ". Drag it onto Shell, Wrap, or Air."
 	sendState(player)
 end
 
@@ -385,7 +395,7 @@ local function startSession(player: Player)
 		inventory = emptyInventory(),
 		design = Design.emptyDesign(),
 		clears = {},
-		hint = "Collect materials, then build your suit layer by layer.",
+		hint = "Pick up a pile, then drag it onto a pad.",
 		problem = nil,
 		mission = nil,
 	}
@@ -399,138 +409,49 @@ for _, cache in world.caches do
 	end)
 end
 
--- Beacon touch = mission complete
-for planetId, beacon in world.beacons do
-	beacon.Touched:Connect(function(hit)
-		local character = hit.Parent
-		if character == nil then return end
-		local player = Players:GetPlayerFromCharacter(character)
-		if player == nil then return end
-		local session = sessions[player]
-		if session == nil or session.mission == nil then return end
-		if session.mission.planetId ~= planetId then return end
-		if session.mission.vitals.alive then
-			session.mission.vitals.reachedBeacon = true
-		end
-	end)
-end
-
--- Kill zone touch = die and respawn at checkpoint
-for _, descendant in world.destinations:GetDescendants() do
-	if descendant:IsA("BasePart") and descendant:GetAttribute("KillZone") then
-		descendant.Touched:Connect(function(hit)
-			local character = hit.Parent
-			if character == nil then return end
-			local humanoid = character:FindFirstChildOfClass("Humanoid")
-			if humanoid and humanoid.Health > 0 then
-				humanoid.Health = 0
-			end
-		end)
+Place.OnServerEvent:Connect(function(player, materialId, slot)
+	if typeof(materialId) ~= "string" or typeof(slot) ~= "string" then
+		return
 	end
-end
+	place(player, materialId, slot)
+end)
 
--- Checkpoint touch = save respawn point
-for _, descendant in world.destinations:GetDescendants() do
-	if descendant:IsA("BasePart") and descendant:GetAttribute("Checkpoint") then
-		descendant.Touched:Connect(function(hit)
-			local character = hit.Parent
-			if character == nil then return end
-			local player = Players:GetPlayerFromCharacter(character)
-			if player == nil then return end
-			local session = sessions[player]
-			if session == nil or session.mission == nil then return end
-			local cpPlanet = descendant:GetAttribute("PlanetId")
-			if cpPlanet == session.mission.planetId then
-				session.mission.lastCheckpoint = descendant.CFrame + Vector3.new(0, 3, 0)
-			end
-		end)
-	end
-end
-
--- Add a layer to the suit
-AddLayer.OnServerEvent:Connect(function(player, materialId, thicknessId)
+ClearSlot.OnServerEvent:Connect(function(player, slot)
 	local session = sessions[player]
-	if session == nil or typeof(materialId) ~= "string" or typeof(thicknessId) ~= "string" then
+	if session == nil or typeof(slot) ~= "string" then
 		return
 	end
-	if materialId == "oxygen" then
-		session.hint = "Use the oxygen control to add air tanks."
-		sendState(player)
-		return
+	if slot == "shell" then
+		session.design.shellMaterialId = nil
+	elseif slot == "wrap" then
+		session.design.insulationMaterialId = nil
+	elseif slot == "air" then
+		session.design.oxygenKg = 0
 	end
-	if (session.inventory[materialId] or 0) <= 0 then
-		session.hint = "You have not found that yet."
-		sendState(player)
-		return
-	end
-	-- Find thickness
-	local thickness = nil
-	for _, opt in Design.THICKNESS_OPTIONS do
-		if opt.id == thicknessId then
-			thickness = opt.meters
-			break
-		end
-	end
-	if thickness == nil then
-		return
-	end
-	-- Max 8 layers
-	if #session.design.layers >= 8 then
-		session.hint = "Maximum 8 layers. Remove one first."
-		sendState(player)
-		return
-	end
-	table.insert(session.design.layers, {
-		materialId = materialId,
-		thicknessM = thickness,
-	})
-	Design.syncLegacy(session.design)
-	local mat = Catalog.materialById(materialId)
-	session.hint = "Added " .. mat.name .. " layer."
 	session.problem = Design.stockProblem(session.design, session.inventory)
+	session.hint = "Took it off."
 	wear(player)
 	sendState(player)
 end)
 
--- Remove a layer by index
-RemoveLayer.OnServerEvent:Connect(function(player, layerIndex)
+SetSize.OnServerEvent:Connect(function(player, sizeId)
 	local session = sessions[player]
-	if session == nil or typeof(layerIndex) ~= "number" then
+	local size = Design.SIZES[sizeId]
+	if session == nil or size == nil then
 		return
 	end
-	layerIndex = math.floor(layerIndex)
-	if layerIndex < 1 or layerIndex > #session.design.layers then
-		return
-	end
-	table.remove(session.design.layers, layerIndex)
-	Design.syncLegacy(session.design)
-	session.hint = "Removed layer."
+	session.design.shellRadiusM = size.shellRadiusM
+	session.design.shellThicknessM = size.shellThicknessM
+	session.design.insulationThicknessM = size.insulationThicknessM
 	session.problem = Design.stockProblem(session.design, session.inventory)
-	wear(player)
-	sendState(player)
-end)
-
--- Set oxygen amount
-SetOxygen.OnServerEvent:Connect(function(player, kg)
-	local session = sessions[player]
-	if session == nil or typeof(kg) ~= "number" then
-		return
-	end
-	local available = session.inventory.oxygen or 0
-	session.design.oxygenKg = math.clamp(kg, 0, available)
-	session.hint = string.format("Packed %.1f kg of oxygen.", session.design.oxygenKg)
-	session.problem = Design.stockProblem(session.design, session.inventory)
+	session.hint = "Suit size changed. The weight is calculated from that."
 	sendState(player)
 end)
 
 Depart.OnServerEvent:Connect(function(player, planetId, difficultyId, side)
-	warn("[CODAG Server] Depart event received:", planetId, difficultyId, side)
 	if typeof(planetId) ~= "string" or typeof(difficultyId) ~= "string" or typeof(side) ~= "string" then
-		warn("[CODAG Server] Depart: bad types")
 		return
 	end
-	local session = sessions[player]
-	warn("[CODAG Server] Depart: session exists =", session ~= nil, "mission =", session and session.mission ~= nil)
 	depart(player, planetId, difficultyId, side)
 end)
 
@@ -546,18 +467,7 @@ local function bind(player: Player)
 		wear(player)
 		local session = sessions[player]
 		if session and session.mission then
-			-- Respawn at last checkpoint instead of ending the mission
-			local checkpoint = session.mission.lastCheckpoint
-			if checkpoint then
-				local root = character:WaitForChild("HumanoidRootPart", 5)
-				if root then
-					workspace.Gravity = gravityFor(session.mission.planetId)
-					applyLook(session.mission.planetId)
-					root.CFrame = checkpoint
-				end
-			else
-				home(player)
-			end
+			home(player)
 		end
 	end)
 	if player.Character then

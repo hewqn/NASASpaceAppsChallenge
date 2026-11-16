@@ -2,6 +2,13 @@
   "name": "CODAG.0",
   "tree": {
     "$className": "DataModel",
+    "Lighting": {
+      "$properties": {
+        "Brightness": 2.0,
+        "ClockTime": 14.0,
+        "GeographicLatitude": 20.0
+      }
+    },
     "ReplicatedStorage": {
       "CODAG": {
         "$path": "src/shared"
@@ -19,17 +26,6 @@
         }
       }
     },
-    "Workspace": {
-      "$properties": {
-        "Gravity": 196.2
-      }
-    },
-    "Lighting": {
-      "$properties": {
-        "ClockTime": 14,
-        "Brightness": 2,
-        "GeographicLatitude": 20
-      }
-    }
+    "Workspace": {}
   }
 }
