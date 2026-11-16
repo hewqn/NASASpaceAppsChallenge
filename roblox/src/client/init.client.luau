@@ -742,10 +742,8 @@ function renderWorkshop()
 	local statsCard = card(workshop, true)
 	label(statsCard, "SUIT SUMMARY", 10, TEXT_FAINT, FONT_TITLE)
 	local totalMass = Design.designMassKg(design)
-	local sealed = Design.isSealed(design)
 	label(statsCard, string.format("Total mass: %.1f kg", totalMass), 12, TEXT_WHITE, FONT_MONO)
-	label(statsCard, "Sealed: " .. (if sealed then "YES" else "NO (need a structural layer)"), 12, if sealed then SUCCESS else DANGER, FONT_MONO)
-	label(statsCard, string.format("Layers: %d / 8", #design.layers), 12, TEXT_DIM, FONT_MONO)
+	label(statsCard, string.format("Layers: %d", #design.layers), 12, TEXT_DIM, FONT_MONO)
 
 	-- Hint / problem
 	if state.problem ~= "" and state.problem ~= nil then
@@ -953,10 +951,12 @@ function renderDifficulty()
 		hotBtn.MouseButton1Click:Connect(function()
 			warn("[CODAG Client] Firing Depart:", chosenPlanet, diffId, "hot")
 			DepartEvent:FireServer(chosenPlanet, diffId, "hot")
+			show(nil)
 		end)
 		coldBtn.MouseButton1Click:Connect(function()
 			warn("[CODAG Client] Firing Depart:", chosenPlanet, diffId, "cold")
 			DepartEvent:FireServer(chosenPlanet, diffId, "cold")
+			show(nil)
 		end)
 	end
 
@@ -1033,6 +1033,11 @@ local function renderHud()
 	local inMission = player:GetAttribute("InMission")
 	hud.Visible = inMission == true
 
+	-- Hide all panels during a mission so only the HUD shows
+	if inMission then
+		show(nil)
+	end
+
 	if not inMission then return end
 
 	hudPlanet.Text = player:GetAttribute("MissionPlanet") or ""
@@ -1063,46 +1068,61 @@ player:GetAttributeChangedSignal("InMission"):Connect(renderHud)
 player:GetAttributeChangedSignal("MissionClock"):Connect(renderHud)
 player:GetAttributeChangedSignal("Alive"):Connect(renderHud)
 
--- ── Debrief ─────────────────────────────────────────────────────────────
-local debrief = page("Debrief")
+-- ── Debrief (appended into HUD) ─────────────────────────────────────────
+local debriefContainer = Instance.new("Frame")
+debriefContainer.Name = "DebriefContainer"
+debriefContainer.Size = UDim2.new(1, 0, 0, 0)
+debriefContainer.AutomaticSize = Enum.AutomaticSize.Y
+debriefContainer.BackgroundTransparency = 1
+debriefContainer.LayoutOrder = -99999
+debriefContainer.Visible = false
+debriefContainer.Parent = hud
+listLayout(debriefContainer, 6)
+
+local function clearDebrief()
+	for _, child in debriefContainer:GetChildren() do
+		if not child:IsA("UIListLayout") then
+			child:Destroy()
+		end
+	end
+	debriefContainer.Visible = false
+end
 
 DebriefEvent.OnClientEvent:Connect(function(report)
-	clear(debrief)
-	show(debrief)
+	clearDebrief()
+	debriefContainer.Visible = true
+
+	divider(debriefContainer)
 
 	if report.survived then
-		label(debrief, "MISSION COMPLETE", 11, SUCCESS, FONT_TITLE)
-		label(debrief, "You survived.", 28, SUCCESS, FONT_DISPLAY)
+		label(debriefContainer, "MISSION COMPLETE", 11, SUCCESS, FONT_TITLE)
+		label(debriefContainer, "You survived.", 18, SUCCESS, FONT_DISPLAY)
 	else
-		label(debrief, "MISSION FAILED", 11, DANGER, FONT_TITLE)
-		label(debrief, report.title, 24, TEXT_WHITE, FONT_DISPLAY)
+		label(debriefContainer, "MISSION FAILED", 11, DANGER, FONT_TITLE)
+		label(debriefContainer, report.title, 16, TEXT_WHITE, FONT_DISPLAY)
 	end
 
-	divider(debrief)
+	label(debriefContainer, report.detail, 12, TEXT_DIM)
 
-	label(debrief, report.detail, 13, TEXT_DIM)
-
-	divider(debrief)
-
-	-- NASA fact cards
 	if report.facts then
-		label(debrief, "FROM THE NASA FACT SHEETS", 10, TEXT_FAINT, FONT_TITLE)
-		label(debrief, "The physics that decided your fate. Every number below came from NSSDC, not from a model or an estimate.", 11, ACCENT)
+		divider(debriefContainer)
+		label(debriefContainer, "NASA FACT SHEETS", 10, TEXT_FAINT, FONT_TITLE)
 
 		for _, fact in report.facts do
-			local fc = card(debrief, false)
-			label(fc, fact.text, 12, TEXT_WHITE)
-			divider(fc)
-			label(fc, fact.body .. " Fact Sheet", 10, TEXT_FAINT, FONT_TITLE)
-			label(fc, fact.sourceUrl, 10, ACCENT, FONT_MONO)
+			local fc = card(debriefContainer, false)
+			label(fc, fact.text, 11, TEXT_WHITE)
+			label(fc, fact.body .. " Fact Sheet", 9, TEXT_FAINT, FONT_TITLE)
+			label(fc, fact.sourceUrl, 9, ACCENT, FONT_MONO)
 		end
 	end
 
-	divider(debrief)
+	divider(debriefContainer)
 
-	local again = btn(debrief, "Return to workshop", true)
-	again.Size = UDim2.new(1, 0, 0, 44)
+	local again = btn(debriefContainer, "Return to workshop", true)
+	again.Size = UDim2.new(1, 0, 0, 38)
 	again.MouseButton1Click:Connect(function()
+		clearDebrief()
+		hud.Visible = false
 		show(workshop)
 		renderWorkshop()
 	end)
