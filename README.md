@@ -1,4 +1,4 @@
-# CODAG.0 -- Can Our Design Actually Go?
+# CODAG.0: Can Our Design Actually Go?
 
 **2026 NASA Space Apps Challenge** | Team CODAG | University of Calgary
 
@@ -42,9 +42,9 @@ The simulation runs for 1200 seconds (20 minutes) with a 5-second time step.
 
 ## What Makes It Creative
 
-Most space education games give you preset ships or binary pass/fail missions. CODAG.0 gives you a box of real materials and says "figure it out." There's no tutorial that tells you aerogel is the best insulator -- you learn that by trying wool on Venus and watching it burn. You learn that carbon fiber is strong and light but doesn't insulate. You learn that Mylar is almost useless in an atmosphere but extraordinary in vacuum.
+Most space education games give you preset ships or binary pass/fail missions. CODAG.0 gives you a box of real materials and says "figure it out." There's no tutorial that tells you aerogel is the best insulator. You learn that by trying wool on Venus and watching it burn. You learn that carbon fiber is strong and light but doesn't insulate. You learn that Mylar is almost useless in an atmosphere but extraordinary in vacuum.
 
-The game also doesn't simplify the planets. Venus really does have 92 bars of surface pressure and a surface temperature of 737 K. Jupiter really doesn't have a surface -- you're at the 1-bar level. Neptune's scale height is a range, not a single number, because that's what NASA's data says. We didn't round, average, or simplify these numbers.
+The game also doesn't simplify the planets. Venus really does have 92 bars of surface pressure and a surface temperature of 737 K. Jupiter really doesn't have a surface, so you're at the 1-bar level. Neptune's scale height is a range, not a single number, because that's what NASA's data says. We didn't round, average, or simplify these numbers.
 
 ## Tools and Technologies
 
@@ -54,6 +54,7 @@ The game also doesn't simplify the planets. Venus really does have 92 bars of su
 - **TypeScript + Vite**: Data pipeline for exporting planet/material JSON to Roblox-compatible Luau modules
 - **Node.js**: Build tooling and data export scripts
 - **Claude AI (Anthropic)**: Used for code generation, debugging, and procedural environment design (space station, material shapes, terrain generation). All AI-generated code was reviewed and integrated by the team.
+- **Sketchfab**: Planet textures sourced from Sketchfab (Creative Commons licensed models).
 
 ## NASA Data Used
 

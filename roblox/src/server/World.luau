@@ -7,7 +7,7 @@ local Catalog = require(ReplicatedStorage:WaitForChild("CODAG").Data.Catalog)
 -- Colors derived from NASA imagery and real surface observations
 
 local LOOK = {
-	earth   = { ground = Color3.fromRGB(111, 143,  98), sky = Color3.fromRGB(135, 175, 210), clock = 14 },
+	earth   = { ground = Color3.fromRGB(111, 143,  98), sky = Color3.fromRGB( 60,  75, 100), clock = 6 },
 	moon    = { ground = Color3.fromRGB(160, 155, 148), sky = Color3.fromRGB(  4,   4,   8), clock = 14 },
 	mercury = { ground = Color3.fromRGB(140, 130, 118), sky = Color3.fromRGB( 10,   8,   6), clock = 14 },
 	venus   = { ground = Color3.fromRGB(180, 130,  60), sky = Color3.fromRGB(160, 110,  40), clock = 12 },
@@ -21,7 +21,7 @@ local LOOK = {
 -- Per-planet Atmosphere config from NASA observations
 -- density/offset/haze scaled to approximate real conditions
 local ATMO = {
-	earth   = { density = 0.35, offset = 0.25, haze = 1.8, glare = 0.6,  color = Color3.fromRGB(170, 196, 220), decay = Color3.fromRGB(105, 135, 180) },
+	earth   = { density = 0.05, offset = 0,    haze = 0,   glare = 0,    color = Color3.fromRGB( 20,  25,  40), decay = Color3.fromRGB( 10,  15,  30) },
 	moon    = { density = 0,    offset = 0,    haze = 0,   glare = 0,    color = Color3.fromRGB(0, 0, 0),       decay = Color3.fromRGB(0, 0, 0) },
 	mercury = { density = 0,    offset = 0,    haze = 0,   glare = 0.1,  color = Color3.fromRGB(20, 15, 10),    decay = Color3.fromRGB(10, 8, 5) },
 	venus   = { density = 0.85, offset = 0.7,  haze = 2.8, glare = 1.0,  color = Color3.fromRGB(200, 155, 60), decay = Color3.fromRGB(170, 120, 40) },
@@ -393,7 +393,7 @@ end
 
 local EARTH_GRAVITY = 9.82
 
-local function generateObby(parent: Instance, planetId: string, center: Vector3, gravityMs2: number, seed: number): Part
+local function generateObby(parent: Instance, planetId: string, center: Vector3, gravityMs2: number, seed: number)
 	local rng = mulberry32(seed)
 	local look = LOOK[planetId] or LOOK.moon
 	local gRatio = math.sqrt(EARTH_GRAVITY / gravityMs2) -- jump distance scale
@@ -412,12 +412,30 @@ local function generateObby(parent: Instance, planetId: string, center: Vector3,
 	obbyFolder.Parent = parent
 
 	-- Start near landing pad, extend outward along +X
-	local curX = center.X + 15
+	local startX = center.X + 15
+	local curX = startX
 	local curY = 3
 	local curZ = center.Z
 
+	-- Track bounding box for kill zone
+	local minZ = curZ
+	local maxZ = curZ
+
+	-- Checkpoint tracking
+	local checkpoints = {}
+
 	-- Number of platforms
 	local count = 15 + math.floor(rng() * 6) -- 15-20
+
+	-- First platform at the start (starting platform)
+	local startPlat = part(obbyFolder, "PlatStart",
+		Vector3.new(8, platHeight, 8),
+		CFrame.new(curX, curY, curZ),
+		accentColor, Enum.Material.SmoothPlastic)
+	startPlat.CastShadow = true
+	startPlat:SetAttribute("Checkpoint", true)
+	startPlat:SetAttribute("PlanetId", planetId)
+	table.insert(checkpoints, startPlat)
 
 	for i = 1, count do
 		-- Gap distance scaled by gravity ratio
@@ -441,20 +459,44 @@ local function generateObby(parent: Instance, planetId: string, center: Vector3,
 		curX = curX + gap
 		curY = math.max(2, curY + dy)
 		curZ = curZ + (rng() - 0.5) * 8 * gRatio -- slight lateral wobble
+		minZ = math.min(minZ, curZ - platDepth)
+		maxZ = math.max(maxZ, curZ + platDepth)
 
 		-- Platform width variation
 		local w = platWidth - rng() * 2  -- 4-6 wide
 		local d = platDepth - rng() * 2
 
+		-- Checkpoint every 5 platforms: neon stripe on top
+		local isCheckpoint = (i % 5 == 0)
+
 		-- Alternate colors for visual rhythm
-		local col = if i % 3 == 0 then accentColor else baseColor
-		local mat = if i % 5 == 0 then Enum.Material.Metal else Enum.Material.Slate
+		local col = if isCheckpoint then lighten(Color3.fromRGB(60, 255, 120), -0.3) elseif i % 3 == 0 then accentColor else baseColor
+		local mat = if isCheckpoint then Enum.Material.SmoothPlastic elseif i % 5 == 0 then Enum.Material.Metal else Enum.Material.Slate
 
 		local plat = part(obbyFolder, "Plat" .. i,
 			Vector3.new(w, platHeight, d),
 			CFrame.new(curX, curY, curZ),
 			col, mat)
 		plat.CastShadow = true
+
+		if isCheckpoint then
+			plat:SetAttribute("Checkpoint", true)
+			plat:SetAttribute("PlanetId", planetId)
+			table.insert(checkpoints, plat)
+
+			-- Neon stripe on top to make checkpoint visible
+			local stripe = Instance.new("Part")
+			stripe.Name = "CheckStripe" .. i
+			stripe.Size = Vector3.new(w, 0.15, 1)
+			stripe.CFrame = CFrame.new(curX, curY + platHeight / 2 + 0.08, curZ)
+			stripe.Color = Color3.fromRGB(60, 255, 120)
+			stripe.Material = Enum.Material.Neon
+			stripe.Transparency = 0.2
+			stripe.Anchored = true
+			stripe.CanCollide = false
+			stripe.CastShadow = false
+			stripe.Parent = obbyFolder
+		end
 
 		-- Every few platforms, add a tall pillar underneath for visual weight
 		if dy > 5 or i % 4 == 0 then
@@ -510,7 +552,36 @@ local function generateObby(parent: Instance, planetId: string, center: Vector3,
 		CFrame.new(curX, curY, curZ),
 		Color3.fromRGB(40, 180, 80), Enum.Material.Neon)
 
-	return beacon
+	-- ── Kill zone: clear terrain under obby and add death floor ──
+	local obbyLength = curX - startX + 20
+	local obbyCenterX = (startX + curX) / 2
+	local obbyCenterZ = (minZ + maxZ) / 2
+	local obbyWidth = math.max(maxZ - minZ + 30, 40)
+
+	-- Clear terrain in the obby corridor
+	terrain:FillBlock(
+		CFrame.new(obbyCenterX, 0, obbyCenterZ),
+		Vector3.new(obbyLength, 60, obbyWidth),
+		Enum.Material.Air
+	)
+
+	-- Invisible kill floor at the bottom
+	local killZone = Instance.new("Part")
+	killZone.Name = planetId .. "KillZone"
+	killZone.Size = Vector3.new(obbyLength, 1, obbyWidth)
+	killZone.CFrame = CFrame.new(obbyCenterX, -25, obbyCenterZ)
+	killZone.Transparency = 1
+	killZone.Anchored = true
+	killZone.CanCollide = false
+	killZone:SetAttribute("KillZone", true)
+	killZone:SetAttribute("PlanetId", planetId)
+	killZone.Parent = obbyFolder
+
+	return {
+		beacon = beacon,
+		killZone = killZone,
+		checkpoints = checkpoints,
+	}
 end
 
 -- ── Build ────────────────────────────────────────────────────────────────
@@ -1134,10 +1205,17 @@ local function build()
 			-- Generate real terrain
 			generateTerrain(planet.id, center, planetRadius, index * 137)
 
-			-- Landing pad (small, embedded in terrain)
+			-- Clear terrain around landing zone so player doesn't spawn inside rock
+			terrain:FillBlock(
+				CFrame.new(cx, 15, cz),
+				Vector3.new(20, 40, 20),
+				Enum.Material.Air
+			)
+
+			-- Landing pad raised above terrain
 			local pad = part(destinations, planet.id .. "Pad",
-				Vector3.new(8, 0.3, 8),
-				CFrame.new(cx, 0.15, cz),
+				Vector3.new(10, 0.5, 10),
+				CFrame.new(cx, 2, cz),
 				lighten(look.ground, 0.2), Enum.Material.Metal)
 			pad:SetAttribute("PlanetId", planet.id)
 			pad.CastShadow = false
@@ -1172,8 +1250,8 @@ local function build()
 			addParticles(destinations, center, PARTICLES[planet.id])
 
 			-- Obstacle course with beacon goal
-			local beacon = generateObby(destinations, planet.id, center, planet.gravityMs2, index * 313)
-			beacons[planet.id] = beacon
+			local obbyResult = generateObby(destinations, planet.id, center, planet.gravityMs2, index * 313)
+			beacons[planet.id] = obbyResult.beacon
 
 			-- Ambient point lights for gas/ice giants (bioluminescent-style)
 			if planet.archetype == "gas" or planet.archetype == "ice" then
@@ -1214,6 +1292,7 @@ local function build()
 		buildPrompt = buildPrompt,
 		planetPads = planetPads,
 		beacons = beacons,
+		destinations = destinations,
 		hexColor = hexColor,
 	}
 end

@@ -1,7 +1,3 @@
--- Freeform layered suit design for CODAG.0.
--- Players stack layers in any order. Each layer is a material at a thickness.
--- The outermost structural layer bears pressure. Heat flows through every layer.
-
 local function dataModule(name: string)
 	if script ~= nil and script.Parent ~= nil and script.Parent.Parent ~= nil then
 		local data = script.Parent.Parent:FindFirstChild("Data")
@@ -19,196 +15,204 @@ local Catalog = dataModule("Catalog")
 local materialById = Catalog.materialById
 
 local TANK_KG_PER_OXYGEN_KG = 5
-local HUMAN_AREA_M2 = 1.8
 local BASE_RADIUS_M = 0.48
 
--- Layer thickness options (meters)
 local THICKNESS_OPTIONS = {
-	{ id = "thin",   label = "Thin",   meters = 0.002  },
-	{ id = "medium", label = "Medium", meters = 0.006  },
-	{ id = "thick",  label = "Thick",  meters = 0.012  },
-	{ id = "heavy",  label = "Heavy",  meters = 0.025  },
+	{ id = "thin",   label = "Thin",   meters = 0.001 },
+	{ id = "medium", label = "Medium", meters = 0.003 },
+	{ id = "thick",  label = "Thick",  meters = 0.006 },
+	{ id = "heavy",  label = "Heavy",  meters = 0.012 },
 }
 
 local function emptyDesign()
 	return {
-		layers = {},       -- array of {materialId, thicknessM}
+		layers = {},
 		oxygenKg = 0,
+		-- Legacy fields kept in sync for Survival.luau backward compat
+		shellMaterialId = nil,
+		shellRadiusM = BASE_RADIUS_M,
+		shellThicknessM = 0,
+		insulationMaterialId = nil,
+		insulationThicknessM = 0,
 	}
 end
 
--- Total outer radius: base + sum of layer thicknesses
-local function outerRadiusM(design): number
-	local r = BASE_RADIUS_M
+-- Derive legacy fields from layers so Survival.luau keeps working
+local function syncLegacy(design)
+	local shellMatId = nil
+	local shellThick = 0
+	local insMatId = nil
+	local insThick = 0
+	local totalThick = 0
 	for _, layer in design.layers do
-		r += layer.thicknessM
+		local mat = materialById(layer.materialId)
+		totalThick += layer.thicknessM
+		if mat.structural then
+			if shellMatId == nil then
+				shellMatId = layer.materialId
+			end
+			shellThick += layer.thicknessM
+		else
+			if insMatId == nil then
+				insMatId = layer.materialId
+			end
+			insThick += layer.thicknessM
+		end
 	end
-	return r
+	design.shellMaterialId = shellMatId
+	design.shellThicknessM = shellThick
+	design.shellRadiusM = BASE_RADIUS_M + totalThick
+	design.insulationMaterialId = insMatId
+	design.insulationThicknessM = insThick
 end
 
--- Surface area at a given radius
-local function areaAtRadius(radius: number): number
+-- Helper accessors used by the server
+local function getShellMaterialId(design): string?
+	for _, layer in design.layers do
+		local mat = materialById(layer.materialId)
+		if mat.structural then
+			return layer.materialId
+		end
+	end
+	return nil
+end
+
+local function outerRadiusM(design): number
+	local total = BASE_RADIUS_M
+	for _, layer in design.layers do
+		total += layer.thicknessM
+	end
+	return total
+end
+
+local function getShellThicknessM(design): number
+	local total = 0
+	for _, layer in design.layers do
+		local mat = materialById(layer.materialId)
+		if mat.structural then
+			total += layer.thicknessM
+		end
+	end
+	return total
+end
+
+-- Mass calculations using legacy fields (kept for Survival compat)
+local function shellVolumeM3(design): number
+	if design.shellMaterialId == nil or design.shellThicknessM <= 0 or design.shellRadiusM <= design.shellThicknessM then
+		return 0
+	end
+	local outer = design.shellRadiusM
+	local inner = outer - design.shellThicknessM
+	return (4 / 3) * math.pi * (outer ^ 3 - inner ^ 3)
+end
+
+local function shellAreaM2(design): number
+	local radius = if design.shellMaterialId then design.shellRadiusM else 0.45
 	return 4 * math.pi * radius * radius
 end
 
--- Mass of a single spherical-shell layer
-local function layerMassKg(layer, innerRadius: number): number
-	local mat = materialById(layer.materialId)
-	local outerR = innerRadius + layer.thicknessM
-	local volume = (4 / 3) * math.pi * (outerR ^ 3 - innerRadius ^ 3)
-	return mat.densityKgM3 * volume
+local function insulationVolumeM3(design): number
+	if design.insulationMaterialId == nil or design.insulationThicknessM <= 0 then
+		return 0
+	end
+	return shellAreaM2(design) * design.insulationThicknessM
 end
 
--- Total mass of all layers + oxygen + tank hardware
+local function shellMassKg(design): number
+	if design.shellMaterialId == nil then
+		return 0
+	end
+	return materialById(design.shellMaterialId).densityKgM3 * shellVolumeM3(design)
+end
+
+local function insulationMassKg(design): number
+	if design.insulationMaterialId == nil then
+		return 0
+	end
+	return materialById(design.insulationMaterialId).densityKgM3 * insulationVolumeM3(design)
+end
+
+local function oxygenHardwareKg(design): number
+	return design.oxygenKg * TANK_KG_PER_OXYGEN_KG
+end
+
 local function designMassKg(design): number
-	local total = 0
-	local r = BASE_RADIUS_M
-	for _, layer in design.layers do
-		total += layerMassKg(layer, r)
-		r += layer.thicknessM
-	end
-	total += design.oxygenKg + design.oxygenKg * TANK_KG_PER_OXYGEN_KG
-	return total
+	return shellMassKg(design) + insulationMassKg(design) + design.oxygenKg + oxygenHardwareKg(design)
 end
 
--- Mass of a single material across all layers that use it
-local function materialMassKg(design, materialId: string): number
-	local total = 0
-	local r = BASE_RADIUS_M
-	for _, layer in design.layers do
-		if layer.materialId == materialId then
-			total += layerMassKg(layer, r)
-		end
-		r += layer.thicknessM
-	end
-	return total
-end
-
--- Is the suit sealed? Needs at least one structural layer.
-local function isSealed(design): boolean
-	for _, layer in design.layers do
-		local mat = materialById(layer.materialId)
-		if mat.structural and layer.thicknessM > 0 then
-			return true
-		end
-	end
-	return false
-end
-
--- Find the outermost structural layer (faces the environment pressure).
-local function outerStructuralLayer(design)
-	local best = nil
-	local bestIndex = 0
-	for i, layer in design.layers do
-		local mat = materialById(layer.materialId)
-		if mat.structural and layer.thicknessM > 0 then
-			if i > bestIndex then
-				best = layer
-				bestIndex = i
-			end
-		end
-	end
-	return best
-end
-
--- Radius at which the outer structural layer sits
-local function outerStructuralRadius(design): number
-	local bestIndex = 0
-	for i, layer in design.layers do
-		local mat = materialById(layer.materialId)
-		if mat.structural and layer.thicknessM > 0 then
-			if i > bestIndex then
-				bestIndex = i
-			end
-		end
-	end
-	local r = BASE_RADIUS_M
-	for i, layer in design.layers do
-		if i == bestIndex then
-			return r
-		end
-		r += layer.thicknessM
-	end
-	return r
-end
-
--- Effective thermal resistance through all layers (K/W).
--- Heat flows inward from environment through each layer in series.
-local function thermalResistance(design, outsidePa: number): number
-	local totalR = 0
-	local r = BASE_RADIUS_M
-	for _, layer in design.layers do
-		local mat = materialById(layer.materialId)
-		local k = mat.conductivity
-		-- Mylar-type materials are much better insulators in vacuum
-		if mat.vacuumConductivity ~= nil and outsidePa < 1000 then
-			k = mat.vacuumConductivity
-		end
-		if k > 0 and layer.thicknessM > 0 then
-			local area = areaAtRadius(r + layer.thicknessM / 2)
-			totalR += layer.thicknessM / (k * area)
-		end
-		r += layer.thicknessM
-	end
-	return totalR
-end
-
--- Check whether you have enough of each material in inventory.
+-- Check if layers use more material than inventory allows
 local function stockProblem(design, inventory): string?
-	-- Check each material used in layers
-	local usedKg = {}
-	local r = BASE_RADIUS_M
-	for _, layer in design.layers do
-		usedKg[layer.materialId] = (usedKg[layer.materialId] or 0) + layerMassKg(layer, r)
-		r += layer.thicknessM
-	end
-	for matId, needed in usedKg do
-		local have = inventory[matId] or 0
-		if needed > have + 1e-6 then
-			local name = materialById(matId).name
-			return name .. " needs " .. string.format("%.1f", needed) .. " kg but you only have " .. string.format("%.1f", have) .. " kg."
+	if design.layers and #design.layers > 0 then
+		-- Layer-based check: accumulate mass per material across layers
+		local usedMass = {}
+		local outerR = BASE_RADIUS_M
+		for _, layer in design.layers do
+			local mat = materialById(layer.materialId)
+			outerR += layer.thicknessM
+			local area = 4 * math.pi * outerR * outerR
+			local mass = mat.densityKgM3 * area * layer.thicknessM
+			usedMass[layer.materialId] = (usedMass[layer.materialId] or 0) + mass
+		end
+		for matId, mass in usedMass do
+			local have = inventory[matId] or 0
+			if mass > have + 1e-6 then
+				local name = string.lower(materialById(matId).name)
+				return "You need more " .. name .. " than you found. Try thinner layers."
+			end
+		end
+	else
+		-- Legacy fallback
+		if design.shellMaterialId ~= nil then
+			local have = inventory[design.shellMaterialId] or 0
+			if shellMassKg(design) > have + 1e-6 then
+				local name = string.lower(materialById(design.shellMaterialId).name)
+				return "That shell is heavier than the " .. name .. " you found. Try a smaller suit."
+			end
+		end
+		if design.insulationMaterialId ~= nil then
+			local have = inventory[design.insulationMaterialId] or 0
+			if insulationMassKg(design) > have + 1e-6 then
+				local name = string.lower(materialById(design.insulationMaterialId).name)
+				return "That wrap is heavier than the " .. name .. " you found. Try a smaller suit."
+			end
 		end
 	end
-	-- Check oxygen
-	local oxygenHave = inventory.oxygen or 0
-	if design.oxygenKg > oxygenHave + 1e-6 then
+	local oxygen = inventory.oxygen or 0
+	if design.oxygenKg > oxygen + 1e-6 then
 		return "You packed more oxygen than you found."
 	end
 	return nil
 end
 
--- For backward compatibility: shell info for the publicDesign format
-local function shellMaterialId(design): string?
-	local structural = outerStructuralLayer(design)
-	if structural then
-		return structural.materialId
+local function isSealed(design): boolean
+	if design.shellMaterialId == nil or design.shellThicknessM <= 0 then
+		return false
 	end
-	return nil
+	if design.shellRadiusM <= design.shellThicknessM then
+		return false
+	end
+	return materialById(design.shellMaterialId).structural
 end
 
-local function shellThicknessM(design): number
-	local structural = outerStructuralLayer(design)
-	if structural then
-		return structural.thicknessM
-	end
-	return 0
-end
+local SIZES = {
+	fits = { shellRadiusM = 0.48, shellThicknessM = 0.0016, insulationThicknessM = 0.012 },
+	bigger = { shellRadiusM = 0.55, shellThicknessM = 0.002, insulationThicknessM = 0.012 },
+	bulky = { shellRadiusM = 0.7, shellThicknessM = 0.004, insulationThicknessM = 0.02 },
+}
 
 return {
 	TANK_KG_PER_OXYGEN_KG = TANK_KG_PER_OXYGEN_KG,
 	BASE_RADIUS_M = BASE_RADIUS_M,
 	THICKNESS_OPTIONS = THICKNESS_OPTIONS,
-	HUMAN_AREA_M2 = HUMAN_AREA_M2,
+	SIZES = SIZES,
 	emptyDesign = emptyDesign,
+	syncLegacy = syncLegacy,
+	shellMaterialId = getShellMaterialId,
 	outerRadiusM = outerRadiusM,
+	shellThicknessM = getShellThicknessM,
+	shellMassKg = shellMassKg,
+	insulationMassKg = insulationMassKg,
 	designMassKg = designMassKg,
-	materialMassKg = materialMassKg,
-	isSealed = isSealed,
-	outerStructuralLayer = outerStructuralLayer,
-	outerStructuralRadius = outerStructuralRadius,
-	thermalResistance = thermalResistance,
 	stockProblem = stockProblem,
-	shellMaterialId = shellMaterialId,
-	shellThicknessM = shellThicknessM,
-	layerMassKg = layerMassKg,
+	isSealed = isSealed,
 }

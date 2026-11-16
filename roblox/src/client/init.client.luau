@@ -82,6 +82,18 @@ gui.ResetOnSpawn = false
 gui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
 gui.Parent = player.PlayerGui
 
+-- ── Mobile detection ────────────────────────────────────────────────────
+local UserInputService = game:GetService("UserInputService")
+local GuiService = game:GetService("GuiService")
+local camera = workspace.CurrentCamera
+local screenWidth = camera and camera.ViewportSize.X or 1920
+-- Only mobile if touch-only device with a small screen (not Studio, not tablet)
+local IS_MOBILE = UserInputService.TouchEnabled
+	and not UserInputService.KeyboardEnabled
+	and not UserInputService.MouseEnabled
+	and not GuiService:IsTenFootInterface()
+	and screenWidth < 700
+
 -- ── Helpers ─────────────────────────────────────────────────────────────
 local function corner(parent, radius)
 	local c = Instance.new("UICorner")
@@ -234,9 +246,15 @@ local function page(name, isPanel)
 	local p = Instance.new("ScrollingFrame")
 	p.Name = name
 	if isPanel then
-		-- Side panel: right side, not fullscreen
-		p.Size = UDim2.new(0, 340, 1, -20)
-		p.Position = UDim2.new(1, -350, 0, 10)
+		if IS_MOBILE then
+			-- Mobile: full-width panel with small margin
+			p.Size = UDim2.new(1, -16, 1, -20)
+			p.Position = UDim2.new(0, 8, 0, 10)
+		else
+			-- Desktop: side panel on the right
+			p.Size = UDim2.new(0, 340, 1, -20)
+			p.Position = UDim2.new(1, -350, 0, 10)
+		end
 	else
 		p.Size = UDim2.new(1, 0, 1, 0)
 	end
@@ -260,13 +278,9 @@ end
 
 local current = nil
 local function show(target)
-	warn("[CODAG Client] show() called, current =", current and current.Name or "nil", "target =", target and target.Name or "nil")
 	if current then current.Visible = false end
 	if target then target.Visible = true end
 	current = target
-	if target then
-		warn("[CODAG Client] show() target Visible =", target.Visible, "Parent =", target.Parent and target.Parent.Name or "nil", "Size =", tostring(target.Size), "Position =", tostring(target.Position))
-	end
 end
 
 -- ── Intro ───────────────────────────────────────────────────────────────
@@ -276,18 +290,27 @@ local introContent = Instance.new("Frame")
 introContent.Size = UDim2.new(1, 0, 0, 0)
 introContent.AutomaticSize = Enum.AutomaticSize.Y
 introContent.BackgroundTransparency = 1
-listLayout(introContent, 16)
+local introListLayout = listLayout(introContent, 16)
+introListLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center
 introContent.Parent = intro
 
 local spacer1 = Instance.new("Frame")
-spacer1.Size = UDim2.new(1, 0, 0, 60)
+spacer1.Size = UDim2.new(1, 0, 0, if IS_MOBILE then 30 else 60)
 spacer1.BackgroundTransparency = 1
 spacer1.Parent = introContent
 
-local introTitle = label(introContent, "CODAG.0", 48, ACCENT, FONT_DISPLAY)
-introTitle.TextXAlignment = Enum.TextXAlignment.Center
+local logoSize = if IS_MOBILE then 140 else 200
+local introLogo = Instance.new("ImageLabel")
+introLogo.Size = UDim2.new(0, logoSize, 0, logoSize)
+introLogo.BackgroundTransparency = 1
+introLogo.Image = "rbxassetid://135974007304660"
+introLogo.ScaleType = Enum.ScaleType.Fit
+introLogo.Parent = introContent
+local introLogoLayout = Instance.new("UIAspectRatioConstraint")
+introLogoLayout.AspectRatio = 1
+introLogoLayout.Parent = introLogo
 
-local introSub = label(introContent, "BUILD YOUR SURVIVAL SUIT. FACE THE SOLAR SYSTEM.", 14, TEXT_DIM, FONT_TITLE)
+local introSub = label(introContent, "BUILD YOUR SURVIVAL SUIT. FACE THE SOLAR SYSTEM.", if IS_MOBILE then 12 else 14, TEXT_DIM, FONT_TITLE)
 introSub.TextXAlignment = Enum.TextXAlignment.Center
 
 local spacer2 = Instance.new("Frame")
@@ -603,7 +626,6 @@ function renderWorkshop()
 	local toPlanets = btn(workshop, "Choose destination", true)
 	toPlanets.Size = UDim2.new(1, 0, 0, 44)
 	toPlanets.MouseButton1Click:Connect(function()
-		warn("[CODAG Client] Choose destination clicked, state =", state ~= nil)
 		show(planets)
 		renderPlanets()
 	end)
@@ -640,16 +662,13 @@ local function isOpen(planetId: string): boolean
 end
 
 function renderPlanets()
-	warn("[CODAG Client] renderPlanets called, state =", state ~= nil)
 	clear(planets)
 
 	if state == nil then
-		warn("[CODAG Client] renderPlanets: state is nil, aborting")
 		return
 	end
 
 	local design = designFrom(state.design)
-	warn("[CODAG Client] renderPlanets: design layers =", #design.layers, "planets =", #Sources.DESTINATION_ORDER)
 	local check = 1.5
 
 	label(planets, "DESTINATIONS", 11, ACCENT, FONT_TITLE)
@@ -703,15 +722,9 @@ function renderPlanets()
 			label(planetCard, string.format("Gravity: %.2f m/s2  |  %s", planet.gravityMs2, planet.role), 11, ACCENT, FONT_MONO)
 
 			local hotOk, hotResult = pcall(Survival.kidResult, design, planet, check, "hot")
-			if not hotOk then
-				warn("[CODAG Client] kidResult HOT error for", planetId, ":", hotResult)
-				hotResult = "Hot side: error"
-			end
+			if not hotOk then hotResult = "Hot side: error" end
 			local coldOk, coldResult = pcall(Survival.kidResult, design, planet, check, "cold")
-			if not coldOk then
-				warn("[CODAG Client] kidResult COLD error for", planetId, ":", coldResult)
-				coldResult = "Cold side: error"
-			end
+			if not coldOk then coldResult = "Cold side: error" end
 			label(planetCard, hotResult, 10, TEXT_DIM, FONT_MONO)
 			label(planetCard, coldResult, 10, TEXT_DIM, FONT_MONO)
 
@@ -728,7 +741,6 @@ function renderPlanets()
 		end
 	end
 
-	warn("[CODAG Client] renderPlanets: finished rendering all planets")
 	divider(planets)
 
 	local back = btn(planets, "Back to workshop", false)
@@ -749,7 +761,7 @@ function renderDifficulty()
 	local planet = Catalog.planetById(chosenPlanet)
 
 	label(difficulty, "MISSION BRIEFING", 11, ACCENT, FONT_TITLE)
-	label(difficulty, planet.name, 28, TEXT_WHITE, FONT_DISPLAY)
+	label(difficulty, planet.name, if IS_MOBILE then 22 else 28, TEXT_WHITE, FONT_DISPLAY)
 	label(difficulty, planet.role, 12, ACCENT)
 
 	divider(difficulty)
@@ -803,9 +815,11 @@ function renderDifficulty()
 
 		local diffId = profile.id
 		hotBtn.MouseButton1Click:Connect(function()
+			warn("[CODAG Client] Firing Depart:", chosenPlanet, diffId, "hot")
 			DepartEvent:FireServer(chosenPlanet, diffId, "hot")
 		end)
 		coldBtn.MouseButton1Click:Connect(function()
+			warn("[CODAG Client] Firing Depart:", chosenPlanet, diffId, "cold")
 			DepartEvent:FireServer(chosenPlanet, diffId, "cold")
 		end)
 	end
@@ -822,9 +836,14 @@ end
 -- ── HUD ─────────────────────────────────────────────────────────────────
 local hud = Instance.new("Frame")
 hud.Name = "HUD"
-hud.Size = UDim2.new(0, 260, 0, 0)
+if IS_MOBILE then
+	hud.Size = UDim2.new(1, -16, 0, 0)
+	hud.Position = UDim2.new(0, 8, 0, 8)
+else
+	hud.Size = UDim2.new(0, 260, 0, 0)
+	hud.Position = UDim2.new(1, -276, 0, 16)
+end
 hud.AutomaticSize = Enum.AutomaticSize.Y
-hud.Position = UDim2.new(1, -276, 0, 16)
 hud.BackgroundColor3 = BG_PANEL
 hud.BackgroundTransparency = 0.15
 hud.BorderSizePixel = 0
@@ -967,12 +986,12 @@ end)
 -- ── Init ────────────────────────────────────────────────────────────────
 local function showIntro()
 	show(intro)
-	introTitle.TextTransparency = 1
+	introLogo.ImageTransparency = 1
 	introSub.TextTransparency = 1
 	startBtn.Visible = false
 
 	task.delay(0.3, function()
-		TweenService:Create(introTitle, TweenInfo.new(0.8, Enum.EasingStyle.Quad), {TextTransparency = 0}):Play()
+		TweenService:Create(introLogo, TweenInfo.new(0.8, Enum.EasingStyle.Quad), {ImageTransparency = 0}):Play()
 	end)
 	task.delay(0.8, function()
 		TweenService:Create(introSub, TweenInfo.new(0.6, Enum.EasingStyle.Quad), {TextTransparency = 0}):Play()

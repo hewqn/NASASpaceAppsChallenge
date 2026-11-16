@@ -17,7 +17,9 @@ local World = require(script.World)
 
 Catalog.assertFactSheetRecords(Catalog.PLANETS)
 
+warn("[CODAG Server] Script starting")
 local world = World.build()
+warn("[CODAG Server] World built")
 local earthG = Catalog.planetById("earth").gravityMs2
 local TIME_SCALE = 30
 
@@ -28,6 +30,13 @@ local function remote(name: string): RemoteEvent
 		folder.Name = "Remotes"
 		folder.Parent = shared
 	end
+	-- Reuse existing event so client references survive server restart (Rojo sync)
+	local existing = folder:FindFirstChild(name)
+	if existing and existing:IsA("RemoteEvent") then
+		warn("[CODAG Server] Reusing event:", name)
+		return existing
+	end
+	warn("[CODAG Server] Creating event:", name)
 	local event = Instance.new("RemoteEvent")
 	event.Name = name
 	event.Parent = folder
@@ -59,8 +68,8 @@ local function applyLook(planetId: string)
 	Lighting.Ambient = look.sky
 	Lighting.OutdoorAmbient = look.sky
 	Lighting.FogColor = look.sky
-	Lighting.FogStart = if planetId == "earth" then 400 else 40
-	Lighting.FogEnd = if planetId == "earth" then 900 else 180
+	Lighting.FogStart = if planetId == "earth" then 9999 else 40
+	Lighting.FogEnd = if planetId == "earth" then 10000 else 180
 
 	local atmoConfig = world.atmo[planetId] or world.atmo.earth
 	local atmoInst = world.atmoInstance
@@ -138,10 +147,8 @@ local function publicDesign(design)
 end
 
 local function sendState(player: Player)
-	warn("[CODAG Server] sendState called for", player.Name)
 	local session = sessions[player]
 	if session == nil then
-		warn("[CODAG Server] sendState: no session for", player.Name)
 		return
 	end
 	local clears = {}
@@ -277,6 +284,8 @@ local function finishMission(player: Player)
 			else Survival.deathDetail(planet, mission.side, cause),
 		facts = lines,
 	})
+	-- Return player to earth station after mission ends
+	home(player)
 	sendState(player)
 end
 
@@ -311,10 +320,8 @@ local function stepMission(player: Player, realDt: number)
 end
 
 local function depart(player: Player, planetId: string, difficultyId: string, side: string)
-	warn("[CODAG Server] depart called:", player.Name, planetId, difficultyId, side)
 	local session = sessions[player]
 	if session == nil or session.mission ~= nil then
-		warn("[CODAG Server] depart: rejected (nil session or active mission)")
 		return
 	end
 	if side ~= "hot" and side ~= "cold" then
@@ -334,20 +341,21 @@ local function depart(player: Player, planetId: string, difficultyId: string, si
 	end
 	local profile = Catalog.difficultyById(difficultyId)
 	local planet = Catalog.planetById(planetId)
+	local pad = world.planetPads[planetId]
 	session.mission = {
 		planetId = planetId,
 		difficultyId = difficultyId,
 		side = side,
 		minSafetyFactor = profile.minSafetyFactor,
 		vitals = Survival.initialVitals(session.design),
+		lastCheckpoint = if pad then pad.CFrame + Vector3.new(0, 5, 0) else nil,
 	}
 	workspace.Gravity = gravityFor(planetId)
 	applyLook(planetId)
 	local character = player.Character
 	local root = character and character:FindFirstChild("HumanoidRootPart")
-	local pad = world.planetPads[planetId]
 	if root and pad then
-		root.CFrame = pad.CFrame + Vector3.new(0, 8, 0)
+		root.CFrame = pad.CFrame + Vector3.new(0, 5, 0)
 	end
 	player:SetAttribute("MissionPlanet", planet.name)
 	player:SetAttribute("MissionSide", side)
@@ -373,7 +381,6 @@ local function collect(player: Player, materialId: string)
 end
 
 local function startSession(player: Player)
-	warn("[CODAG Server] startSession for", player.Name)
 	sessions[player] = {
 		inventory = emptyInventory(),
 		design = Design.emptyDesign(),
@@ -406,6 +413,38 @@ for planetId, beacon in world.beacons do
 			session.mission.vitals.reachedBeacon = true
 		end
 	end)
+end
+
+-- Kill zone touch = die and respawn at checkpoint
+for _, descendant in world.destinations:GetDescendants() do
+	if descendant:IsA("BasePart") and descendant:GetAttribute("KillZone") then
+		descendant.Touched:Connect(function(hit)
+			local character = hit.Parent
+			if character == nil then return end
+			local humanoid = character:FindFirstChildOfClass("Humanoid")
+			if humanoid and humanoid.Health > 0 then
+				humanoid.Health = 0
+			end
+		end)
+	end
+end
+
+-- Checkpoint touch = save respawn point
+for _, descendant in world.destinations:GetDescendants() do
+	if descendant:IsA("BasePart") and descendant:GetAttribute("Checkpoint") then
+		descendant.Touched:Connect(function(hit)
+			local character = hit.Parent
+			if character == nil then return end
+			local player = Players:GetPlayerFromCharacter(character)
+			if player == nil then return end
+			local session = sessions[player]
+			if session == nil or session.mission == nil then return end
+			local cpPlanet = descendant:GetAttribute("PlanetId")
+			if cpPlanet == session.mission.planetId then
+				session.mission.lastCheckpoint = descendant.CFrame + Vector3.new(0, 3, 0)
+			end
+		end)
+	end
 end
 
 -- Add a layer to the suit
@@ -445,6 +484,7 @@ AddLayer.OnServerEvent:Connect(function(player, materialId, thicknessId)
 		materialId = materialId,
 		thicknessM = thickness,
 	})
+	Design.syncLegacy(session.design)
 	local mat = Catalog.materialById(materialId)
 	session.hint = "Added " .. mat.name .. " layer."
 	session.problem = Design.stockProblem(session.design, session.inventory)
@@ -463,6 +503,7 @@ RemoveLayer.OnServerEvent:Connect(function(player, layerIndex)
 		return
 	end
 	table.remove(session.design.layers, layerIndex)
+	Design.syncLegacy(session.design)
 	session.hint = "Removed layer."
 	session.problem = Design.stockProblem(session.design, session.inventory)
 	wear(player)
@@ -483,11 +524,13 @@ SetOxygen.OnServerEvent:Connect(function(player, kg)
 end)
 
 Depart.OnServerEvent:Connect(function(player, planetId, difficultyId, side)
-	warn("[CODAG Server] Depart event:", player.Name, planetId, difficultyId, side)
+	warn("[CODAG Server] Depart event received:", planetId, difficultyId, side)
 	if typeof(planetId) ~= "string" or typeof(difficultyId) ~= "string" or typeof(side) ~= "string" then
-		warn("[CODAG Server] Depart: type check failed")
+		warn("[CODAG Server] Depart: bad types")
 		return
 	end
+	local session = sessions[player]
+	warn("[CODAG Server] Depart: session exists =", session ~= nil, "mission =", session and session.mission ~= nil)
 	depart(player, planetId, difficultyId, side)
 end)
 
@@ -503,7 +546,18 @@ local function bind(player: Player)
 		wear(player)
 		local session = sessions[player]
 		if session and session.mission then
-			home(player)
+			-- Respawn at last checkpoint instead of ending the mission
+			local checkpoint = session.mission.lastCheckpoint
+			if checkpoint then
+				local root = character:WaitForChild("HumanoidRootPart", 5)
+				if root then
+					workspace.Gravity = gravityFor(session.mission.planetId)
+					applyLook(session.mission.planetId)
+					root.CFrame = checkpoint
+				end
+			else
+				home(player)
+			end
 		end
 	end)
 	if player.Character then
