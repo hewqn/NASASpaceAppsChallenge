@@ -1,4 +1,4 @@
-# CODAG.0: Can Our Design Actually Go?
+# Team CODAG
 
 **2026 NASA Space Apps Challenge** | Team CODAG | University of Calgary
 
