@@ -314,7 +314,14 @@ local function stepMission(player: Player, realDt: number)
 	player:SetAttribute("AirHeld", held)
 	player:SetAttribute("Alive", vitals.alive)
 	player:SetAttribute("CauseTitle", if vitals.cause then Survival.deathTitle(vitals.cause) else "")
-	if not vitals.alive or vitals.reachedBeacon or Survival.survived(vitals) then
+	if not vitals.alive then
+		local character = player.Character
+		local humanoid = character and character:FindFirstChildOfClass("Humanoid")
+		if humanoid and humanoid.Health > 0 then
+			humanoid.Health = 0
+		end
+		finishMission(player)
+	elseif vitals.reachedBeacon or Survival.survived(vitals) then
 		finishMission(player)
 	end
 end
