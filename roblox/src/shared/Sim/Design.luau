@@ -194,6 +194,51 @@ local function isSealed(design): boolean
 	return materialById(design.shellMaterialId).structural
 end
 
+-- Return the outermost structural layer (last structural one, inside-to-outside)
+local function outerStructuralLayer(design)
+	local result = nil
+	for _, layer in design.layers do
+		local mat = materialById(layer.materialId)
+		if mat.structural then
+			result = layer
+		end
+	end
+	return result
+end
+
+-- Inner radius of the outermost structural layer (for pressure vessel stress calc)
+local function outerStructuralRadius(design): number
+	local r = BASE_RADIUS_M
+	local lastStructuralR = BASE_RADIUS_M
+	for _, layer in design.layers do
+		local mat = materialById(layer.materialId)
+		if mat.structural then
+			lastStructuralR = r
+		end
+		r += layer.thicknessM
+	end
+	return lastStructuralR
+end
+
+-- Total thermal resistance of all layers (series model, spherical shells)
+local function thermalResistance(design, outsidePa: number): number
+	local totalR = 0
+	local r = BASE_RADIUS_M
+	for _, layer in design.layers do
+		local mat = materialById(layer.materialId)
+		local k = mat.conductivity
+		if mat.vacuumConductivity ~= nil and outsidePa < 1000 then
+			k = mat.vacuumConductivity
+		end
+		if k > 0 and layer.thicknessM > 0 then
+			local layerArea = 4 * math.pi * (r + layer.thicknessM / 2) ^ 2
+			totalR += layer.thicknessM / (k * layerArea)
+		end
+		r += layer.thicknessM
+	end
+	return totalR
+end
+
 local SIZES = {
 	fits = { shellRadiusM = 0.48, shellThicknessM = 0.0016, insulationThicknessM = 0.012 },
 	bigger = { shellRadiusM = 0.55, shellThicknessM = 0.002, insulationThicknessM = 0.012 },
@@ -215,4 +260,7 @@ return {
 	designMassKg = designMassKg,
 	stockProblem = stockProblem,
 	isSealed = isSealed,
+	outerStructuralLayer = outerStructuralLayer,
+	outerStructuralRadius = outerStructuralRadius,
+	thermalResistance = thermalResistance,
 }
