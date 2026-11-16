@@ -524,6 +524,11 @@ Depart.OnServerEvent:Connect(function(player, planetId, difficultyId, side)
 end)
 
 Abort.OnServerEvent:Connect(function(player)
+	local session = sessions[player]
+	if session then
+		session.mission = nil
+	end
+	player:SetAttribute("InMission", false)
 	home(player)
 	sendState(player)
 end)
