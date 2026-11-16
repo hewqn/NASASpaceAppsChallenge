@@ -1,12 +1,13 @@
 # CODAG.0: Can Our Design Actually Go?
 
-**2026 NASA Space Apps Challenge** | Team UNAC | University of Calgary
+**2026 NASA Space Apps Challenge** | Team CODAG | University of Calgary
 
-A Roblox game where players design survival suits from real engineering materials and test them on planets across the solar system. Every planet uses real NASA data. Every material has real physical properties. The game teaches players that space exploration is an engineering problem with no single right answer. Your suit has to handle the actual temperatures, pressures, and atmospheres that NASA has measured.
+A Roblox game where players design survival suits from real engineering materials and test them on planets across the solar system. Every planet uses real NASA data. Every material has real physical properties. The game teaches players that space exploration is an engineering problem with no single right answer, where your suit has to cater to all obstacles thrown.
+
 
 ## What It Does
 
-You start in a space station orbiting Earth. Around you are storage racks holding 13 real materials: metals like aluminum and titanium, insulators like aerogel and Mylar, and an oxygen tank. You pick them up and layer them onto a suit in any order you choose, at four thickness options (thin, medium, thick, heavy). Then you choose a destination (the Moon, Mars, Mercury, Venus, Jupiter, Saturn, Uranus, or Neptune) and the game simulates whether your suit keeps you alive for 20 minutes.
+You start with a station on Earth. Around you are storage racks holding 13 real materials: metals like aluminum and titanium, insulators like aerogel and Mylar, and an oxygen tank. You pick them up and layer them onto a suit in any order you choose, at four thickness options (thin, medium, thick, heavy). Then you choose a destination -- the Moon, Mars, Mercury, Venus, Jupiter, Saturn, Uranus, or Neptune -- and the game simulates whether your suit keeps you alive for 20 minutes.
 
 The simulation checks:
 
