@@ -235,7 +235,8 @@ end
 
 local function clear(frame)
 	for _, child in frame:GetChildren() do
-		if not child:IsA("UIListLayout") and not child:IsA("UIPadding") and not child:IsA("UICorner") and not child:IsA("UIStroke") then
+		if not child:IsA("UIListLayout") and not child:IsA("UIPadding") and not child:IsA("UICorner") and not child:IsA("UIStroke")
+			and child.Name ~= "CollapseHeader" then
 			child:Destroy()
 		end
 	end
