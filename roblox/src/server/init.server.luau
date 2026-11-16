@@ -256,7 +256,8 @@ local function finishMission(player: Player)
 	end
 	local mission = session.mission
 	session.mission = nil
-	player:SetAttribute("InMission", false)
+	-- Don't set InMission=false here; keep HUD visible so debrief can render.
+	-- The client fires Abort when the player clicks "Return to workshop".
 	local madeIt = Survival.survived(mission.vitals) or mission.vitals.reachedBeacon == true
 	if madeIt then
 		session.clears[mission.planetId] = true
@@ -284,9 +285,8 @@ local function finishMission(player: Player)
 			else Survival.deathDetail(planet, mission.side, cause),
 		facts = lines,
 	})
-	-- Return player to earth station after mission ends
-	home(player)
-	sendState(player)
+	-- Player stays on the planet reading the debrief.
+	-- home() and sendState() happen when the client fires Abort.
 end
 
 local function stepMission(player: Player, realDt: number)

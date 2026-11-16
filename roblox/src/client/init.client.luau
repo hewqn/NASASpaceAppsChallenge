@@ -1035,7 +1035,7 @@ end
 
 local function renderHud()
 	local inMission = player:GetAttribute("InMission")
-	hud.Visible = inMission == true
+	hud.Visible = inMission == true or debriefContainer.Visible
 
 	-- Hide all panels during a mission so only the HUD shows
 	if inMission then
@@ -1095,6 +1095,7 @@ end
 DebriefEvent.OnClientEvent:Connect(function(report)
 	clearDebrief()
 	debriefContainer.Visible = true
+	hud.Visible = true
 
 	divider(debriefContainer)
 
@@ -1125,6 +1126,7 @@ DebriefEvent.OnClientEvent:Connect(function(report)
 	local again = btn(debriefContainer, "Return to workshop", true)
 	again.Size = UDim2.new(1, 0, 0, 38)
 	again.MouseButton1Click:Connect(function()
+		AbortEvent:FireServer()
 		clearDebrief()
 		hud.Visible = false
 		show(workshop)
