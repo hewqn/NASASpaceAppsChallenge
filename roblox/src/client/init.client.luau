@@ -1021,6 +1021,10 @@ abortBtn.Size = UDim2.new(1, 0, 0, 32)
 abortBtn.TextColor3 = DANGER
 abortBtn.MouseButton1Click:Connect(function()
 	AbortEvent:FireServer()
+	clearDebrief()
+	hud.Visible = false
+	show(workshop)
+	renderWorkshop()
 end)
 
 local function clock(seconds: number): string
